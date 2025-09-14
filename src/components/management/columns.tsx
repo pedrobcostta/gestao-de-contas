@@ -27,7 +27,7 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } 
   vencido: "destructive",
 };
 
-export const columns = ({ onEdit }: { onEdit: (account: Account) => void }): ColumnDef<Account>[] => {
+export const columns = ({ onEdit, onView }: { onEdit: (account: Account) => void; onView: (account: Account) => void; }): ColumnDef<Account>[] => {
   const queryClient = useQueryClient();
 
   const handleDelete = async (accountId: string) => {
@@ -79,6 +79,9 @@ export const columns = ({ onEdit }: { onEdit: (account: Account) => void }): Col
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onView(account)}>
+                Visualizar
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onEdit(account)}>
                 Editar
               </DropdownMenuItem>

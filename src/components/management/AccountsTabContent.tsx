@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Account } from "@/types";
 import { AccountForm } from "./AccountForm";
 import { columns } from "./columns";
+import { AccountDetails } from "./AccountDetails";
 
 interface AccountsTabContentProps {
   data: Account[];
@@ -28,13 +29,23 @@ interface AccountsTabContentProps {
 export function AccountsTabContent({ data, isLoading, managementType }: AccountsTabContentProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [accountForDetails, setAccountForDetails] = useState<Account | null>(null);
+
+  const handleViewAccount = (account: Account) => {
+    setAccountForDetails(account);
+    setIsDetailsOpen(true);
+  };
 
   const table = useReactTable({
     data,
-    columns: columns({ onEdit: (account) => {
-      setSelectedAccount(account);
-      setIsFormOpen(true);
-    }}),
+    columns: columns({
+      onEdit: (account) => {
+        setSelectedAccount(account);
+        setIsFormOpen(true);
+      },
+      onView: handleViewAccount,
+    }),
     getCoreRowModel: getCoreRowModel(),
   });
 
@@ -103,6 +114,11 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
         setIsOpen={setIsFormOpen}
         account={selectedAccount}
         managementType={managementType}
+      />
+      <AccountDetails
+        isOpen={isDetailsOpen}
+        setIsOpen={setIsDetailsOpen}
+        account={accountForDetails}
       />
     </div>
   );

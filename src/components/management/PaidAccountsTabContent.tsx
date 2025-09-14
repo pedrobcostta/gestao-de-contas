@@ -18,6 +18,7 @@ import { Account } from "@/types";
 import { AccountForm } from "./AccountForm";
 import { columns } from "./columns";
 import { supabase } from "@/integrations/supabase/client";
+import { AccountDetails } from "./AccountDetails";
 
 interface PaidAccountsTabContentProps {
   managementType: Account["management_type"];
@@ -26,6 +27,8 @@ interface PaidAccountsTabContentProps {
 export function PaidAccountsTabContent({ managementType }: PaidAccountsTabContentProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [accountForDetails, setAccountForDetails] = useState<Account | null>(null);
 
   const { data: paidAccounts = [], isLoading } = useQuery({
     queryKey: ['accounts', managementType, 'pago'],
@@ -41,12 +44,20 @@ export function PaidAccountsTabContent({ managementType }: PaidAccountsTabConten
     }
   });
 
+  const handleViewAccount = (account: Account) => {
+    setAccountForDetails(account);
+    setIsDetailsOpen(true);
+  };
+
   const table = useReactTable({
     data: paidAccounts,
-    columns: columns({ onEdit: (account) => {
-      setSelectedAccount(account);
-      setIsFormOpen(true);
-    }}),
+    columns: columns({
+      onEdit: (account) => {
+        setSelectedAccount(account);
+        setIsFormOpen(true);
+      },
+      onView: handleViewAccount,
+    }),
     getCoreRowModel: getCoreRowModel(),
   });
 
@@ -97,6 +108,11 @@ export function PaidAccountsTabContent({ managementType }: PaidAccountsTabConten
         setIsOpen={setIsFormOpen}
         account={selectedAccount}
         managementType={managementType}
+      />
+      <AccountDetails
+        isOpen={isDetailsOpen}
+        setIsOpen={setIsDetailsOpen}
+        account={accountForDetails}
       />
     </div>
   );
