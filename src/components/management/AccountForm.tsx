@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import<think>**Resolving Destructuring Issue**
+
+I've resolved the TypeScript error in `AccountForm.tsx`. I realized I was incorrectly trying to remove an `id` from `accountData`, which represents update data and doesn't include an `id`. The `id` is part of the original account. I've removed the incorrect destructuring, directly using `accountData` as a base, which avoids the error.
+
+
+</think> { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, addMonths, addWeeks, addQuarters } from "date-fns";
@@ -225,9 +230,8 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
 
     if (values.is_recurrent && values.status === 'pago' && !account.is_recurrent) {
       const nextDueDate = addMonths(values.due_date, 1);
-      const { id, ...newRecurrentAccountData } = accountData;
       const newRecurrentAccount = {
-        ...newRecurrentAccountData,
+        ...accountData,
         due_date: format(nextDueDate, "yyyy-MM-dd"),
         status: 'pendente',
         payment_date: null,
