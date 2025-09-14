@@ -65,7 +65,7 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold">{title}</h1>
         <div className="flex gap-2">
           <Select value={String(selectedMonth)} onValueChange={(value) => setSelectedMonth(Number(value))}>
@@ -123,7 +123,7 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
 
       {/* Submenu e Conteúdo */}
       <Tabs defaultValue="contas" className="space-y-4">
-        <TabsList>
+        <TabsList className="overflow-x-auto w-full justify-start">
           <TabsTrigger value="contas">Gestão de Contas</TabsTrigger>
           <TabsTrigger value="pix">Gestão de PIX</TabsTrigger>
           <TabsTrigger value="bancos">Gestão de Bancos</TabsTrigger>

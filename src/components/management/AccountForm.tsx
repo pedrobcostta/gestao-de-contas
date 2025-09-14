@@ -42,6 +42,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Account } from "@/types";
 import { showError, showSuccess } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthProvider";
+import { CurrencyInput } from "@/components/CurrencyInput";
 
 const formSchema = z.object({
   name: z.string().min(1, "O nome é obrigatório."),
@@ -103,8 +104,8 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
     if (account) {
       form.reset({
         ...account,
-        due_date: new Date(account.due_date),
-        payment_date: account.payment_date ? new Date(account.payment_date) : null,
+        due_date: new Date(`${account.due_date}T00:00:00`),
+        payment_date: account.payment_date ? new Date(`${account.payment_date}T00:00:00`) : null,
         total_value: account.purchase_type === 'parcelada' ? account.installment_value : account.total_value,
       });
     } else {
@@ -226,7 +227,13 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               <FormField control={form.control} name="total_value" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Valor</FormLabel>
-                  <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                  <FormControl>
+                    <CurrencyInput
+                      placeholder="R$ 0,00"
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -274,6 +281,14 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                     </SelectContent>
                   </Select>
                   <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="is_recurrent" render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm h-full">
+                  <div className="space-y-0.5">
+                    <FormLabel>Conta Recorrente?</FormLabel>
+                  </div>
+                  <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                 </FormItem>
               )} />
               {purchaseType === 'parcelada' && !account && (
@@ -331,14 +346,6 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                 <FormLabel>Observações</FormLabel>
                 <FormControl><Textarea placeholder="Qualquer detalhe adicional..." {...field} value={field.value ?? ''} /></FormControl>
                 <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="is_recurrent" render={({ field }) => (
-              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                <div className="space-y-0.5">
-                  <FormLabel>Conta Recorrente?</FormLabel>
-                </div>
-                <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
               </FormItem>
             )} />
             <DialogFooter>
