@@ -5,6 +5,7 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
+import { startOfMonth, endOfMonth, format } from "date-fns";
 
 import {
   Table,
@@ -22,22 +23,29 @@ import { AccountDetails } from "./AccountDetails";
 
 interface PaidAccountsTabContentProps {
   managementType: Account["management_type"];
+  selectedYear: number;
+  selectedMonth: number;
 }
 
-export function PaidAccountsTabContent({ managementType }: PaidAccountsTabContentProps) {
+export function PaidAccountsTabContent({ managementType, selectedYear, selectedMonth }: PaidAccountsTabContentProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [accountForDetails, setAccountForDetails] = useState<Account | null>(null);
 
+  const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
+  const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
+
   const { data: paidAccounts = [], isLoading } = useQuery({
-    queryKey: ['accounts', managementType, 'pago'],
+    queryKey: ['accounts', managementType, 'pago', selectedYear, selectedMonth],
     queryFn: async (): Promise<Account[]> => {
       const { data, error } = await supabase
         .from('accounts')
         .select('*')
         .eq('management_type', managementType)
-        .eq('status', 'pago');
+        .eq('status', 'pago')
+        .gte('due_date', format(startDate, "yyyy-MM-dd"))
+        .lte('due_date', format(endDate, "yyyy-MM-dd"));
       
       if (error) throw new Error(error.message);
       return data || [];

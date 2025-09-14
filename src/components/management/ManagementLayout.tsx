@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DollarSign, CheckCircle, AlertTriangle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { Account } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -12,20 +14,38 @@ import { PaidAccountsTabContent } from "./PaidAccountsTabContent";
 import { ReportsTabContent } from "./ReportsTabContent";
 import { ConfigurationTabContent } from "./ConfigurationTabContent";
 import { UsersTabContent } from "./UsersTabContent";
+import { startOfMonth, endOfMonth, format } from "date-fns";
 
 interface ManagementLayoutProps {
   title: string;
   managementType: 'pessoal' | 'casa' | 'pai' | 'mae';
 }
 
+const months = [
+  { value: 0, label: "Janeiro" }, { value: 1, label: "Fevereiro" }, { value: 2, label: "Março" },
+  { value: 3, label: "Abril" }, { value: 4, label: "Maio" }, { value: 5, label: "Junho" },
+  { value: 6, label: "Julho" }, { value: 7, label: "Agosto" }, { value: 8, label: "Setembro" },
+  { value: 9, label: "Outubro" }, { value: 10, label: "Novembro" }, { value: 11, label: "Dezembro" },
+];
+
+const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
+
 const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+  const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
+  const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
+
   const { data: accounts = [], isLoading } = useQuery({
-    queryKey: ['accounts', managementType],
+    queryKey: ['accounts', managementType, selectedYear, selectedMonth],
     queryFn: async (): Promise<Account[]> => {
       const { data, error } = await supabase
         .from('accounts')
         .select('*')
-        .eq('management_type', managementType);
+        .eq('management_type', managementType)
+        .gte('due_date', format(startDate, "yyyy-MM-dd"))
+        .lte('due_date', format(endDate, "yyyy-MM-dd"));
       
       if (error) throw new Error(error.message);
       return data || [];
@@ -45,7 +65,27 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">{title}</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">{title}</h1>
+        <div className="flex gap-2">
+          <Select value={String(selectedMonth)} onValueChange={(value) => setSelectedMonth(Number(value))}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Mês" />
+            </SelectTrigger>
+            <SelectContent>
+              {months.map(month => <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="Ano" />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map(year => <SelectItem key={year} value={String(year)}>{year}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
       {/* Resumo Consolidado */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -128,12 +168,12 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
               <CardTitle>Histórico de Contas Pagas</CardTitle>
             </CardHeader>
             <CardContent>
-              <PaidAccountsTabContent managementType={managementType} />
+              <PaidAccountsTabContent managementType={managementType} selectedYear={selectedYear} selectedMonth={selectedMonth} />
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="relatorios">
-          <ReportsTabContent managementType={managementType} />
+          <ReportsTabContent managementType={managementType} selectedYear={selectedYear} selectedMonth={selectedMonth} />
         </TabsContent>
         <TabsContent value="usuarios">
            <Card>

@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -32,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import { CalendarIcon, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,6 +46,7 @@ const accountSchema = z.object({
   total_value: z.coerce.number().positive("O valor deve ser positivo."),
   status: z.enum(["pago", "pendente", "vencido"]),
   purchase_type: z.enum(["unica", "parcelada"]),
+  is_recurrent: z.boolean().default(false),
 });
 
 interface AccountFormProps {
@@ -62,6 +65,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
       total_value: 0,
       status: "pendente",
       purchase_type: "unica",
+      is_recurrent: false,
     },
   });
 
@@ -82,6 +86,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
           total_value: account.total_value,
           status: account.status,
           purchase_type: account.purchase_type,
+          is_recurrent: account.is_recurrent,
         });
         setExistingOtherAttachments(account.other_attachments || []);
       } else {
@@ -91,6 +96,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
           total_value: 0,
           status: "pendente",
           purchase_type: "unica",
+          is_recurrent: false,
         });
         setExistingOtherAttachments([]);
       }
@@ -158,6 +164,27 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         showError(`Erro ao salvar conta: ${error.message}`);
       } else {
         showSuccess(`Conta ${account ? 'atualizada' : 'criada'} com sucesso!`);
+        
+        // Se for recorrente e foi paga, cria a do próximo mês
+        if (values.is_recurrent && values.status === 'pago') {
+          const nextDueDate = addMonths(values.due_date, 1);
+          const newRecurrentAccount = {
+            ...accountData,
+            due_date: format(nextDueDate, "yyyy-MM-dd"),
+            status: 'pendente',
+            payment_date: null,
+            payment_proof_url: null,
+          };
+          delete (newRecurrentAccount as any).id;
+
+          const { error: recurrentError } = await supabase.from('accounts').insert(newRecurrentAccount);
+          if (recurrentError) {
+            showError(`Erro ao criar conta recorrente do próximo mês: ${recurrentError.message}`);
+          } else {
+            showSuccess('Conta do próximo mês criada automaticamente!');
+          }
+        }
+
         queryClient.invalidateQueries({ queryKey: ['accounts', managementType] });
         setIsOpen(false);
       }
@@ -283,6 +310,26 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                     </SelectContent>
                   </Select>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="is_recurrent"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <FormLabel>Conta Recorrente</FormLabel>
+                    <FormDescription>
+                      Se ativado, a conta será recriada para o próximo mês após o pagamento.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />

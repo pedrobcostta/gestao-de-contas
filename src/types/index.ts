@@ -18,6 +18,7 @@ export interface Account {
   status: "pago" | "pendente" | "vencido";
   fees_and_fines: number | null;
   created_at: string;
+  is_recurrent: boolean;
 }
 
 export interface PixKey {

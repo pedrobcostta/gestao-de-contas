@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,8 @@ import { formatCurrency } from "@/lib/utils";
 
 interface ReportsTabContentProps {
   managementType: Account["management_type"];
+  selectedYear: number;
+  selectedMonth: number;
 }
 
 const COLORS = {
@@ -18,14 +20,19 @@ const COLORS = {
   "Vencido": "#FF8042",
 };
 
-export function ReportsTabContent({ managementType }: ReportsTabContentProps) {
+export function ReportsTabContent({ managementType, selectedYear, selectedMonth }: ReportsTabContentProps) {
+  const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
+  const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
+
   const { data: accounts = [], isLoading } = useQuery({
-    queryKey: ['accounts', managementType],
+    queryKey: ['accounts', managementType, selectedYear, selectedMonth, 'reports'],
     queryFn: async (): Promise<Account[]> => {
       const { data, error } = await supabase
         .from('accounts')
         .select('*')
-        .eq('management_type', managementType);
+        .eq('management_type', managementType)
+        .gte('due_date', format(startDate, "yyyy-MM-dd"))
+        .lte('due_date', format(endDate, "yyyy-MM-dd"));
       
       if (error) throw new Error(error.message);
       return data || [];
@@ -36,23 +43,22 @@ export function ReportsTabContent({ managementType }: ReportsTabContentProps) {
     return <p>Carregando relatórios...</p>;
   }
 
-  // Process data for monthly summary chart
-  const monthlyData = accounts.reduce((acc, account) => {
-    const monthKey = format(parseISO(account.due_date), 'yyyy-MM');
-    if (!acc[monthKey]) {
-      acc[monthKey] = 0;
+  // Process data for monthly summary chart (now daily for the selected month)
+  const dailyData = accounts.reduce((acc, account) => {
+    const dayKey = format(parseISO(account.due_date), 'dd/MM');
+    if (!acc[dayKey]) {
+      acc[dayKey] = 0;
     }
-    acc[monthKey] += account.total_value;
+    acc[dayKey] += account.total_value;
     return acc;
   }, {} as { [key: string]: number });
 
-  const chartData = Object.keys(monthlyData)
-    .map(monthKey => ({
-      date: new Date(parseInt(monthKey.split('-')[0]), parseInt(monthKey.split('-')[1]) - 1),
-      name: format(new Date(parseInt(monthKey.split('-')[0]), parseInt(monthKey.split('-')[1]) - 1), 'MMM/yy', { locale: ptBR }),
-      Total: monthlyData[monthKey],
+  const chartData = Object.keys(dailyData)
+    .map(dayKey => ({
+      name: dayKey,
+      Total: dailyData[dayKey],
     }))
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   // Process data for status pie chart
   const statusData = accounts.reduce((acc, account) => {
@@ -70,7 +76,7 @@ export function ReportsTabContent({ managementType }: ReportsTabContentProps) {
     <div className="grid gap-6 md:grid-cols-2">
       <Card>
         <CardHeader>
-          <CardTitle>Resumo Mensal de Despesas</CardTitle>
+          <CardTitle>Resumo de Despesas do Mês</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
