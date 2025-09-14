@@ -1,13 +1,42 @@
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DollarSign, CheckCircle, AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Account } from "@/types";
+import { formatCurrency } from "@/lib/utils";
+import { AccountsTabContent } from "./AccountsTabContent";
 
 interface ManagementLayoutProps {
   title: string;
   managementType: 'pessoal' | 'casa' | 'pai' | 'mae';
 }
 
-const ManagementLayout = ({ title }: ManagementLayoutProps) => {
+const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
+  const { data: accounts = [], isLoading } = useQuery({
+    queryKey: ['accounts', managementType],
+    queryFn: async (): Promise<Account[]> => {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('management_type', managementType);
+      
+      if (error) throw new Error(error.message);
+      return data || [];
+    }
+  });
+
+  const summary = accounts.reduce((acc, account) => {
+    if (account.status === 'pago') {
+      acc.paid += account.total_value;
+    } else if (account.status === 'pendente') {
+      acc.open += account.total_value;
+    } else if (account.status === 'vencido') {
+      acc.overdue += account.total_value;
+    }
+    return acc;
+  }, { open: 0, paid: 0, overdue: 0 });
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">{title}</h1>
@@ -20,7 +49,7 @@ const ManagementLayout = ({ title }: ManagementLayoutProps) => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 0,00</div>
+            <div className="text-2xl font-bold">{formatCurrency(summary.open)}</div>
             <p className="text-xs text-muted-foreground">Total de contas pendentes</p>
           </CardContent>
         </Card>
@@ -30,7 +59,7 @@ const ManagementLayout = ({ title }: ManagementLayoutProps) => {
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 0,00</div>
+            <div className="text-2xl font-bold">{formatCurrency(summary.paid)}</div>
             <p className="text-xs text-muted-foreground">Total pago este mês</p>
           </CardContent>
         </Card>
@@ -40,7 +69,7 @@ const ManagementLayout = ({ title }: ManagementLayoutProps) => {
             <AlertTriangle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 0,00</div>
+            <div className="text-2xl font-bold">{formatCurrency(summary.overdue)}</div>
             <p className="text-xs text-muted-foreground">Total de contas vencidas</p>
           </CardContent>
         </Card>
@@ -50,11 +79,11 @@ const ManagementLayout = ({ title }: ManagementLayoutProps) => {
       <Tabs defaultValue="contas" className="space-y-4">
         <TabsList>
           <TabsTrigger value="contas">Gestão de Contas</TabsTrigger>
-          <TabsTrigger value="pix">Gestão de PIX</TabsTrigger>
-          <TabsTrigger value="bancos">Gestão de Bancos</TabsTrigger>
-          <TabsTrigger value="pagas">Contas Pagas</TabsTrigger>
-          <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
-          <TabsTrigger value="config">Configuração</TabsTrigger>
+          <TabsTrigger value="pix" disabled>Gestão de PIX</TabsTrigger>
+          <TabsTrigger value="bancos" disabled>Gestão de Bancos</TabsTrigger>
+          <TabsTrigger value="pagas" disabled>Contas Pagas</TabsTrigger>
+          <TabsTrigger value="relatorios" disabled>Relatórios</TabsTrigger>
+          <TabsTrigger value="config" disabled>Configuração</TabsTrigger>
         </TabsList>
         <TabsContent value="contas">
           <Card>
@@ -62,11 +91,10 @@ const ManagementLayout = ({ title }: ManagementLayoutProps) => {
               <CardTitle>Contas do Mês</CardTitle>
             </CardHeader>
             <CardContent>
-              <p>A tabela de contas e os filtros aparecerão aqui.</p>
+              <AccountsTabContent data={accounts} isLoading={isLoading} managementType={managementType} />
             </CardContent>
           </Card>
         </TabsContent>
-        {/* Outros TabsContent virão aqui no futuro */}
       </Tabs>
     </div>
   );
