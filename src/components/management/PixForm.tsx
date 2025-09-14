@@ -30,13 +30,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { PixKey } from "@/types";
 import { showError, showSuccess } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthProvider";
 
 const formSchema = z.object({
-  key_type: z.enum(["cpf_cnpj", "celular", "email", "aleatoria"]),
+  key_type: z.enum(["cpf_cnpj", "celular", "email", "aleatoria", "br_code"]),
   key_value: z.string().min(1, "A chave PIX é obrigatória."),
   owner_name: z.string().min(1, "O nome do titular é obrigatório."),
   bank_name: z.string().min(1, "O nome do banco é obrigatório."),
@@ -57,6 +58,8 @@ export function PixForm({ isOpen, setIsOpen, pixKey, managementType }: PixFormPr
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
   });
+
+  const keyType = form.watch("key_type");
 
   useEffect(() => {
     if (pixKey) {
@@ -121,6 +124,7 @@ export function PixForm({ isOpen, setIsOpen, pixKey, managementType }: PixFormPr
                     <SelectItem value="celular">Celular</SelectItem>
                     <SelectItem value="email">E-mail</SelectItem>
                     <SelectItem value="aleatoria">Aleatória</SelectItem>
+                    <SelectItem value="br_code">PIX Copia e Cola</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -128,8 +132,14 @@ export function PixForm({ isOpen, setIsOpen, pixKey, managementType }: PixFormPr
             )} />
             <FormField control={form.control} name="key_value" render={({ field }) => (
               <FormItem>
-                <FormLabel>Chave PIX</FormLabel>
-                <FormControl><Input {...field} /></FormControl>
+                <FormLabel>{keyType === 'br_code' ? 'Código PIX' : 'Chave PIX'}</FormLabel>
+                <FormControl>
+                  {keyType === 'br_code' ? (
+                    <Textarea {...field} placeholder="Cole o código PIX aqui..." />
+                  ) : (
+                    <Input {...field} />
+                  )}
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )} />

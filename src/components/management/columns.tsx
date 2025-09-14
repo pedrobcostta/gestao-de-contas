@@ -98,6 +98,17 @@ export const columns = ({ onView, onEdit }: { onView: (account: Account) => void
       cell: ({ row }) => formatCurrency(row.original.total_value),
     },
     {
+      id: "installment",
+      header: "Parcela",
+      cell: ({ row }) => {
+        const { account_type, installment_current, installments_total } = row.original;
+        if (account_type === 'parcelada' && installment_current && installments_total) {
+          return `${installment_current} / ${installments_total}`;
+        }
+        return null;
+      }
+    },
+    {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {

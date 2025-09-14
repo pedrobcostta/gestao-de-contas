@@ -1,0 +1,1 @@
+ALTER TYPE public.pix_key_type ADD VALUE IF NOT EXISTS 'br_code';

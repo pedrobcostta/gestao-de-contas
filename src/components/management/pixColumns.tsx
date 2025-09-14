@@ -1,7 +1,7 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal, Copy } from "lucide-react"
+import { MoreHorizontal, Copy, QrCode } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 
 import { Button } from "@/components/ui/button"
@@ -23,9 +23,10 @@ const keyTypeLabels: { [key: string]: string } = {
   celular: "Celular",
   email: "E-mail",
   aleatoria: "Aleatória",
+  br_code: "Copia e Cola",
 };
 
-export const pixColumns = ({ onEdit }: { onEdit: (pixKey: PixKey) => void; }): ColumnDef<PixKey>[] => {
+export const pixColumns = ({ onEdit, onViewQr }: { onEdit: (pixKey: PixKey) => void; onViewQr: (pixKey: PixKey) => void; }): ColumnDef<PixKey>[] => {
   const queryClient = useQueryClient();
 
   const handleDelete = async (pixKeyId: string) => {
@@ -49,6 +50,13 @@ export const pixColumns = ({ onEdit }: { onEdit: (pixKey: PixKey) => void; }): C
     {
       accessorKey: "key_value",
       header: "Chave PIX",
+      cell: ({ row }) => {
+        const value = row.original.key_value;
+        if (row.original.key_type === 'br_code') {
+          return <span className="font-mono text-xs">{value.substring(0, 30)}...</span>
+        }
+        return value;
+      }
     },
     {
       accessorKey: "owner_name",
@@ -84,6 +92,12 @@ export const pixColumns = ({ onEdit }: { onEdit: (pixKey: PixKey) => void; }): C
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
+              {pixKey.key_type === 'br_code' && (
+                <DropdownMenuItem onClick={() => onViewQr(pixKey)}>
+                  <QrCode className="mr-2 h-4 w-4" />
+                  Ver QR Code
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => handleCopy('key')}>
                 Copiar Chave
               </DropdownMenuItem>

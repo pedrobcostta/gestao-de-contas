@@ -19,6 +19,7 @@ import { PixKey } from "@/types";
 import { pixColumns } from "./pixColumns";
 import { supabase } from "@/integrations/supabase/client";
 import { PixForm } from "./PixForm";
+import { QRCodeModal } from "./QRCodeModal";
 
 interface PixTabContentProps {
   managementType: PixKey["management_type"];
@@ -27,6 +28,8 @@ interface PixTabContentProps {
 export function PixTabContent({ managementType }: PixTabContentProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPixKey, setSelectedPixKey] = useState<PixKey | null>(null);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [qrCodeValue, setQrCodeValue] = useState("");
 
   const { data: pixKeys = [], isLoading } = useQuery({
     queryKey: ['pix_keys', managementType],
@@ -51,9 +54,16 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
     setIsFormOpen(true);
   };
 
+  const handleViewQr = (pixKey: PixKey) => {
+    if (pixKey.key_type === 'br_code') {
+      setQrCodeValue(pixKey.key_value);
+      setIsQrModalOpen(true);
+    }
+  };
+
   const table = useReactTable({
     data: pixKeys,
-    columns: pixColumns({ onEdit: handleEdit }),
+    columns: pixColumns({ onEdit: handleEdit, onViewQr: handleViewQr }),
     getCoreRowModel: getCoreRowModel(),
   });
 
@@ -78,7 +88,7 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={pixColumns({ onEdit: handleEdit }).length} className="h-24 text-center">
+                <TableCell colSpan={pixColumns({ onEdit: handleEdit, onViewQr: handleViewQr }).length} className="h-24 text-center">
                   Carregando...
                 </TableCell>
               </TableRow>
@@ -94,7 +104,7 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={pixColumns({ onEdit: handleEdit }).length} className="h-24 text-center">
+                <TableCell colSpan={pixColumns({ onEdit: handleEdit, onViewQr: handleViewQr }).length} className="h-24 text-center">
                   Nenhuma chave PIX encontrada.
                 </TableCell>
               </TableRow>
@@ -107,6 +117,11 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
         setIsOpen={setIsFormOpen}
         pixKey={selectedPixKey}
         managementType={managementType}
+      />
+      <QRCodeModal
+        isOpen={isQrModalOpen}
+        setIsOpen={setIsQrModalOpen}
+        value={qrCodeValue}
       />
     </div>
   );

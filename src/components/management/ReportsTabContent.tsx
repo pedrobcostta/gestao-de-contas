@@ -6,6 +6,7 @@ import { ptBR } from 'date-fns/locale';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import { DateRange } from "react-day-picker";
+import { DollarSign, CheckCircle, AlertTriangle, ListChecks } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Account } from "@/types";
@@ -84,6 +85,36 @@ export function ReportsTabContent({ managementType }: ReportsTabContentProps) {
     }
   }, [accounts, reportType]);
 
+  const summary = useMemo(() => {
+    const stats = {
+      total: 0,
+      paid: 0,
+      pending: 0,
+      overdue: 0,
+      countTotal: filteredAccounts.length,
+      countPaid: 0,
+      countPending: 0,
+      countOverdue: 0,
+    };
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const acc of filteredAccounts) {
+      stats.total += acc.total_value;
+      if (acc.status === 'pago') {
+        stats.paid += acc.total_value;
+        stats.countPaid++;
+      } else if (acc.status === 'vencido' || (acc.status === 'pendente' && isBefore(parseISO(`${acc.due_date}T00:00:00`), today))) {
+        stats.overdue += acc.total_value;
+        stats.countOverdue++;
+      } else {
+        stats.pending += acc.total_value;
+        stats.countPending++;
+      }
+    }
+    return stats;
+  }, [filteredAccounts]);
+
   const handleExportTXT = () => {
     let content = `Relatório de Contas - ${reportType.toUpperCase()}\n`;
     content += `Período: ${format(dateRange!.from!, 'dd/MM/yyyy')} a ${format(dateRange!.to!, 'dd/MM/yyyy')}\n\n`;
@@ -94,6 +125,9 @@ export function ReportsTabContent({ managementType }: ReportsTabContentProps) {
       content += `Valor: ${formatCurrency(acc.total_value)}\n`;
       content += `Vencimento: ${format(parseISO(`${acc.due_date}T00:00:00`), 'dd/MM/yyyy')}\n`;
       content += `Status: ${acc.status}\n`;
+      if (acc.account_type === 'parcelada') {
+        content += `Parcela: ${acc.installment_current}/${acc.installments_total}\n`;
+      }
     });
 
     const blob = new Blob(["\uFEFF" + content], { type: 'text/plain;charset=utf-8' });
@@ -116,13 +150,22 @@ export function ReportsTabContent({ managementType }: ReportsTabContentProps) {
 
       autoTable(doc, {
         startY: 30,
-        head: [['Nome', 'Vencimento', 'Valor', 'Status']],
-        body: filteredAccounts.map(acc => [
-          acc.name,
-          format(parseISO(`${acc.due_date}T00:00:00`), 'dd/MM/yyyy'),
-          formatCurrency(acc.total_value),
-          acc.status,
-        ]),
+        head: [['Nome', 'Vencimento', 'Valor', 'Status', 'Detalhes']],
+        body: filteredAccounts.map(acc => {
+          let details = '';
+          if (acc.account_type === 'parcelada') {
+            details = `Parcela ${acc.installment_current}/${acc.installments_total}`;
+          } else if (acc.account_type === 'recorrente') {
+            details = 'Recorrente';
+          }
+          return [
+            acc.name,
+            format(parseISO(`${acc.due_date}T00:00:00`), 'dd/MM/yyyy'),
+            formatCurrency(acc.total_value),
+            acc.status,
+            details
+          ];
+        }),
       });
 
       const accountsWithProof = filteredAccounts.filter(acc => acc.payment_proof_url);
@@ -204,34 +247,78 @@ export function ReportsTabContent({ managementType }: ReportsTabContentProps) {
       </Card>
 
       {isLoading ? <p>Carregando relatórios...</p> : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Despesas por Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                  nameKey="name"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                >
-                  {statusData.map((entry) => (
-                    <Cell key={`cell-${entry.name}`} fill={COLORS[entry.name as keyof typeof COLORS]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <>
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(summary.total)}</div>
+                <p className="text-xs text-muted-foreground">{summary.countTotal} contas no período</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Pago</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(summary.paid)}</div>
+                <p className="text-xs text-muted-foreground">{summary.countPaid} contas pagas</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pendente</CardTitle>
+                <ListChecks className="h-4 w-4 text-yellow-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(summary.pending)}</div>
+                <p className="text-xs text-muted-foreground">{summary.countPending} contas pendentes</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Vencido</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(summary.overdue)}</div>
+                <p className="text-xs text-muted-foreground">{summary.countOverdue} contas vencidas</p>
+              </CardContent>
+            </Card>
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Despesas por Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={statusData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    nameKey="name"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {statusData.map((entry) => (
+                      <Cell key={`cell-${entry.name}`} fill={COLORS[entry.name as keyof typeof COLORS]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </>
       )}
     </div>
   );
