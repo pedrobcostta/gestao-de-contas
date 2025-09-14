@@ -243,7 +243,8 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
 
       queryClient.invalidateQueries({ queryKey: ['accounts', managementType] });
       setIsOpen(false);
-    } catch (error: any) {
+    } catch (error: any)
+      {
       showError(`Erro: ${error.message}`);
     } finally {
       setIsUploading(false);
@@ -302,12 +303,12 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={purchaseType === 'parcelada' && !account}>
-                    <FormControl>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={purchaseType === 'parcelada' && !account}>
+                  <FormControl>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
-                    </FormControl>
+                  </FormControl>
                     <SelectContent>
                       <SelectItem value="pendente">Pendente</SelectItem>
                       <SelectItem value="pago">Pago</SelectItem>
@@ -324,12 +325,12 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Banco de Pagamento</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione um banco" />
                       </SelectTrigger>
-                    </FormControl>
+                  </FormControl>
                     <SelectContent>
                       {bankAccounts.map(b => <SelectItem key={b.id} value={b.account_name}>{b.account_name}</SelectItem>)}
                     </SelectContent>
@@ -345,12 +346,12 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo de Compra</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={!!account}>
-                    <FormControl>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={!!account}>
+                  <FormControl>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
-                    </FormControl>
+                  </FormControl>
                     <SelectContent>
                       <SelectItem value="unica">Única</SelectItem>
                       <SelectItem value="parcelada">Parcelada</SelectItem>
@@ -370,12 +371,12 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Frequência</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
-                        </FormControl>
+                      </FormControl>
                         <SelectContent>
                           <SelectItem value="weekly">Semanal</SelectItem>
                           <SelectItem value="monthly">Mensal</SelectItem>
