@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -54,6 +54,21 @@ export function AccountDetails({ isOpen, setIsOpen, account }: AccountDetailsPro
     },
     enabled: !!account?.group_id,
   });
+
+  const summary = useMemo(() => {
+    if (!installments || installments.length === 0) return null;
+
+    const paidInstallments = installments.filter(i => i.status === 'pago');
+    const unpaidInstallments = installments.filter(i => i.status !== 'pago');
+
+    const paidCount = paidInstallments.length;
+    const totalPaid = paidInstallments.reduce((sum, i) => sum + (i.total_value || 0), 0);
+
+    const remainingCount = unpaidInstallments.length;
+    const totalRemaining = unpaidInstallments.reduce((sum, i) => sum + (i.total_value || 0), 0);
+
+    return { paidCount, totalPaid, remainingCount, totalRemaining };
+  }, [installments]);
 
   if (!account) return null;
 
@@ -135,6 +150,29 @@ export function AccountDetails({ isOpen, setIsOpen, account }: AccountDetailsPro
                 )}
               </CardContent>
             </Card>
+            {summary && (
+              <Card className="mt-4">
+                  <CardHeader><CardTitle>Resumo das Parcelas</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-4 text-sm pt-4">
+                      <div>
+                          <p className="font-medium text-muted-foreground">Parcelas Pagas</p>
+                          <p>{summary.paidCount} de {installments.length}</p>
+                      </div>
+                      <div>
+                          <p className="font-medium text-muted-foreground">Valor Total Pago</p>
+                          <p>{formatCurrency(summary.totalPaid)}</p>
+                      </div>
+                      <div>
+                          <p className="font-medium text-muted-foreground">Parcelas a Pagar</p>
+                          <p>{summary.remainingCount} de {installments.length}</p>
+                      </div>
+                      <div>
+                          <p className="font-medium text-muted-foreground">Valor Restante</p>
+                          <p>{formatCurrency(summary.totalRemaining)}</p>
+                      </div>
+                  </CardContent>
+              </Card>
+            )}
           </TabsContent>
           <TabsContent value="attachments">
             <Card>

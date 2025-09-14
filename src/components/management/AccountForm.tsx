@@ -43,6 +43,7 @@ import { Account, BankAccount } from "@/types";
 import { showError, showSuccess } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthProvider";
 import { CurrencyInput } from "@/components/CurrencyInput";
+import { NumericInput } from "@/components/ui/numeric-input";
 
 const formSchema = z.object({
   name: z.string().min(1, "O nome é obrigatório."),
@@ -50,16 +51,40 @@ const formSchema = z.object({
   due_date: z.date({ required_error: "A data de vencimento é obrigatória." }),
   status: z.enum(["pendente", "pago", "vencido"]),
   account_type: z.enum(["unica", "parcelada", "recorrente"]),
-  installments_total: z.coerce.number().optional(),
+  
+  is_total_value: z.boolean().default(false),
+  installments_total: z.coerce.number().min(2).max(999).optional(),
+  initial_installment: z.coerce.number().min(1).optional(),
+
   recurrence_end_date: z.date().optional().nullable(),
   recurrence_indefinite: z.boolean().default(false),
+  
   payment_date: z.date().optional().nullable(),
   payment_method: z.enum(["dinheiro", "pix", "boleto", "transferencia", "cartao"]).optional().nullable(),
   payment_bank_id: z.string().optional().nullable(),
   pix_br_code: z.string().optional().nullable(),
+  
+  fees_and_fines: z.coerce.number().optional().nullable(),
+
   notes: z.string().optional().nullable(),
   bill_proof: z.instanceof(FileList).optional(),
   payment_proof: z.instanceof(FileList).optional(),
+}).refine(data => {
+    if (data.account_type === 'parcelada' && !data.installments_total) {
+        return false;
+    }
+    return true;
+}, {
+    message: "O total de parcelas é obrigatório.",
+    path: ["installments_total"],
+}).refine(data => {
+    if (data.account_type === 'parcelada') {
+        return data.initial_installment && data.installments_total && data.initial_installment <= data.installments_total;
+    }
+    return true;
+}, {
+    message: "A parcela inicial não pode ser maior que o total de parcelas.",
+    path: ["initial_installment"],
 });
 
 interface AccountFormProps {
@@ -98,6 +123,8 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
       account_type: "unica",
       status: "pendente",
       recurrence_indefinite: true,
+      installments_total: 2,
+      initial_installment: 1,
     },
   });
 
@@ -136,6 +163,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         status: "pendente",
         account_type: "unica",
         installments_total: 2,
+        initial_installment: 1,
         payment_date: null,
         payment_method: undefined,
         notes: "",
@@ -173,6 +201,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
             bill_proof_url,
             payment_proof_url,
             recurrence_end_date,
+            fees_and_fines: values.fees_and_fines,
           })
           .eq("id", account.id);
         if (error) throw error;
@@ -180,19 +209,30 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
       } else { // CREATE
         if (values.account_type === 'parcelada' && values.installments_total && values.installments_total > 1) {
           const groupId = uuidv4();
-          const newAccounts = Array.from({ length: values.installments_total }).map((_, i) => {
+          const initial_installment = values.initial_installment || 1;
+          const installmentsToCreate = values.installments_total - initial_installment + 1;
+
+          let installmentValue = 0;
+          if (values.is_total_value) {
+            installmentValue = parseFloat((values.total_value / values.installments_total).toFixed(2));
+          } else {
+            installmentValue = values.total_value;
+          }
+
+          const newAccounts = Array.from({ length: installmentsToCreate }).map((_, i) => {
+            const currentInstallmentNumber = initial_installment + i;
             const dueDate = new Date(values.due_date);
             dueDate.setMonth(dueDate.getMonth() + i);
             return {
               user_id: session.user.id,
               management_type: managementType,
-              name: `${values.name} ${i + 1}/${values.installments_total}`,
+              name: `${values.name} ${currentInstallmentNumber}/${values.installments_total}`,
               due_date: format(dueDate, "yyyy-MM-dd"),
-              total_value: values.total_value,
+              total_value: installmentValue,
               account_type: 'parcelada',
               installments_total: values.installments_total,
-              installment_current: i + 1,
-              installment_value: values.total_value,
+              installment_current: currentInstallmentNumber,
+              installment_value: installmentValue,
               status: 'pendente',
               notes: values.notes,
               group_id: groupId,
@@ -202,7 +242,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
           });
           const { error } = await supabase.from('accounts').insert(newAccounts);
           if (error) throw error;
-          showSuccess(`${values.installments_total} parcelas criadas com sucesso!`);
+          showSuccess(`${installmentsToCreate} parcelas criadas com sucesso!`);
         } else {
           const { error } = await supabase.from("accounts").insert([
             {
@@ -214,6 +254,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               bill_proof_url,
               payment_proof_url,
               recurrence_end_date,
+              fees_and_fines: values.fees_and_fines,
             },
           ]);
           if (error) throw error;
@@ -244,13 +285,13 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Nome</FormLabel>
-                  <FormControl><Input placeholder="Ex: Conta de Luz" {...field} /></FormControl>
+                  <FormControl><Input placeholder="Ex: Compra de TV" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="total_value" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Valor {accountType === 'parcelada' ? 'da Parcela' : ''}</FormLabel>
+                  <FormLabel>Valor</FormLabel>
                   <FormControl>
                     <CurrencyInput
                       placeholder="R$ 0,00"
@@ -294,6 +335,21 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                   <FormMessage />
                 </FormItem>
               )} />
+              {status === 'vencido' && (
+                <FormField control={form.control} name="fees_and_fines" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Juros e Multas</FormLabel>
+                    <FormControl>
+                      <CurrencyInput
+                        placeholder="R$ 0,00"
+                        value={field.value || 0}
+                        onValueChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              )}
               <FormField control={form.control} name="account_type" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo de Conta</FormLabel>
@@ -309,13 +365,30 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                 </FormItem>
               )} />
               {accountType === 'parcelada' && !account && (
-                <FormField control={form.control} name="installments_total" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Total de Parcelas</FormLabel>
-                    <FormControl><Input type="number" min="2" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md">
+                  <FormField control={form.control} name="installments_total" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Total de Parcelas</FormLabel>
+                      <FormControl><NumericInput {...field} min={2} max={999} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="initial_installment" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Parcela Inicial</FormLabel>
+                      <FormControl><Input type="number" min="1" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="is_total_value" render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-2 pt-6 col-span-2">
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <FormLabel>O valor informado é o total da compra (não da parcela)</FormLabel>
+                    </FormItem>
+                  )} />
+                </div>
               )}
               {accountType === 'recorrente' && (
                 <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4 border p-4 rounded-md">

@@ -63,7 +63,7 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
       <div className="flex justify-end">
         <Button onClick={handleAddAccount}>Adicionar Conta</Button>
       </div>
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

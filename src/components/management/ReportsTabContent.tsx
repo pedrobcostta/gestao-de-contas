@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format, parseISO, startOfMonth, endOfMonth, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { jsPDF } from "jspdf";
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { formatCurrency } from "@/lib/utils";
-import { showError, showSuccess } from "@/utils/toast";
+import { showError, showSuccess, showLoading, dismissToast } from "@/utils/toast";
 
 interface ReportsTabContentProps {
   managementType: Account["management_type"];
@@ -28,17 +28,18 @@ const COLORS = {
 
 const getImageAsBase64 = (url: string): Promise<string> => {
   return new Promise((resolve, reject) => {
-    fetch(url)
-      .then(response => response.blob())
-      .then(blob => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          resolve(reader.result as string);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      })
-      .catch(reject);
+    const xhr = new XMLHttpRequest();
+    xhr.onload = function () {
+      const reader = new FileReader();
+      reader.onloadend = function () {
+        resolve(reader.result as string);
+      };
+      reader.readAsDataURL(xhr.response);
+    };
+    xhr.onerror = reject;
+    xhr.open('GET', url);
+    xhr.responseType = 'blob';
+    xhr.send();
   });
 };
 
@@ -95,7 +96,7 @@ export function ReportsTabContent({ managementType }: ReportsTabContentProps) {
       content += `Status: ${acc.status}\n`;
     });
 
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob(["\uFEFF" + content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -131,8 +132,9 @@ export function ReportsTabContent({ managementType }: ReportsTabContentProps) {
         let y = 25;
 
         for (const acc of accountsWithProof) {
+          if (!acc.payment_proof_url) continue;
           try {
-            const imgData = await getImageAsBase64(acc.payment_proof_url!);
+            const imgData = await getImageAsBase64(acc.payment_proof_url);
             const imgProps = doc.getImageProperties(imgData);
             const imgWidth = 180;
             const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
@@ -163,7 +165,6 @@ export function ReportsTabContent({ managementType }: ReportsTabContentProps) {
     }
   };
 
-  // Data for charts
   const statusData = filteredAccounts.reduce((acc, account) => {
     const status = account.status.charAt(0).toUpperCase() + account.status.slice(1);
     const existing = acc.find(item => item.name === status);

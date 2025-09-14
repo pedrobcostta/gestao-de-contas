@@ -43,7 +43,7 @@ export function UsersTabContent() {
       <div className="flex justify-end">
         <Button onClick={() => setIsFormOpen(true)}>Adicionar Usuário</Button>
       </div>
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
