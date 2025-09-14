@@ -119,6 +119,12 @@ export function ReportsTabContent({ managementType }: ReportsTabContentProps) {
     let content = `Relatório de Contas - ${reportType.toUpperCase()}\n`;
     content += `Período: ${format(dateRange!.from!, 'dd/MM/yyyy')} a ${format(dateRange!.to!, 'dd/MM/yyyy')}\n\n`;
     
+    content += `Resumo do Período:\n`;
+    content += `Valor Total: ${formatCurrency(summary.total)} (${summary.countTotal} contas)\n`;
+    content += `Total Pago: ${formatCurrency(summary.paid)} (${summary.countPaid} contas)\n`;
+    content += `Total Pendente: ${formatCurrency(summary.pending)} (${summary.countPending} contas)\n`;
+    content += `Total Vencido: ${formatCurrency(summary.overdue)} (${summary.countOverdue} contas)\n\n`;
+
     filteredAccounts.forEach(acc => {
       content += `----------------------------------------\n`;
       content += `Nome: ${acc.name}\n`;
@@ -166,6 +172,21 @@ export function ReportsTabContent({ managementType }: ReportsTabContentProps) {
             details
           ];
         }),
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY;
+      doc.setFontSize(12);
+      doc.text("Resumo do Período", 14, finalY + 10);
+      
+      autoTable(doc, {
+          startY: finalY + 15,
+          theme: 'plain',
+          body: [
+              [`Valor Total:`, `${formatCurrency(summary.total)} (${summary.countTotal} contas)`],
+              [`Total Pago:`, `${formatCurrency(summary.paid)} (${summary.countPaid} contas)`],
+              [`Total Pendente:`, `${formatCurrency(summary.pending)} (${summary.countPending} contas)`],
+              [`Total Vencido:`, `${formatCurrency(summary.overdue)} (${summary.countOverdue} contas)`],
+          ],
       });
 
       const accountsWithProof = filteredAccounts.filter(acc => acc.payment_proof_url);

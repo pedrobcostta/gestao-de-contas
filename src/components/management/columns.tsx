@@ -27,7 +27,7 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } 
   vencido: "destructive",
 };
 
-export const columns = ({ onView, onEdit }: { onView: (account: Account) => void; onEdit: (account: Account) => void; }): ColumnDef<Account & { isGroup?: boolean, subRows?: Account[] }>[] => {
+export const columns = ({ onView, onEdit }: { onView: (account: Account) => void; onEdit: (account: Account) => void; }): ColumnDef<Account & { isGroup?: boolean, subRows?: Account[], installment_summary?: string }>[] => {
   const queryClient = useQueryClient();
 
   const handleDelete = async (account: Account) => {
@@ -101,7 +101,10 @@ export const columns = ({ onView, onEdit }: { onView: (account: Account) => void
       id: "installment",
       header: "Parcela",
       cell: ({ row }) => {
-        const { account_type, installment_current, installments_total } = row.original;
+        const { account_type, installment_current, installments_total, isGroup, installment_summary } = row.original;
+        if (isGroup) {
+          return <Badge variant="outline">{installment_summary}</Badge>;
+        }
         if (account_type === 'parcelada' && installment_current && installments_total) {
           return `${installment_current} / ${installments_total}`;
         }
@@ -114,7 +117,7 @@ export const columns = ({ onView, onEdit }: { onView: (account: Account) => void
       cell: ({ row }) => {
         const { status, isGroup } = row.original;
         if (isGroup) {
-          return <Badge variant="outline">{status}</Badge>;
+          return null;
         }
         return (
           <Badge variant={statusVariant[status] || "secondary"}>

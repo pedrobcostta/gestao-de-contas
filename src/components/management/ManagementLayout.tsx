@@ -77,7 +77,7 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
       }
     }
 
-    const groupedAccounts: (Account & { subRows?: Account[], isGroup?: boolean })[] = [];
+    const groupedAccounts: (Account & { subRows?: Account[], isGroup?: boolean, installment_summary?: string })[] = [];
     for (const [groupId, installments] of installmentsByGroup.entries()) {
       installments.sort((a, b) => (a.installment_current || 0) - (b.installment_current || 0));
       const firstInstallment = installments[0];
@@ -90,11 +90,12 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
         name: parentName,
         due_date: firstInstallment.due_date,
         total_value: totalValue,
-        status: `${paidCount}/${installments.length} pagas`,
+        status: 'agrupado',
         account_type: 'parcelada',
         subRows: installments,
         management_type: firstInstallment.management_type,
         isGroup: true,
+        installment_summary: `${paidCount}/${installments.length} pagas`,
       };
       groupedAccounts.push(parentRow);
     }
@@ -243,7 +244,7 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
           </Card>
         </TabsContent>
         <TabsContent value="relatorios">
-          <ReportsTabContent managementType={managementType} selectedYear={selectedYear} selectedMonth={selectedMonth} />
+          <ReportsTabContent managementType={managementType} />
         </TabsContent>
         <TabsContent value="usuarios">
            <Card>
