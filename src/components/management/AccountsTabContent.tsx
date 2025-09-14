@@ -13,9 +13,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { Account } from "@/types";
 import { columns } from "./columns";
 import { AccountDetails } from "./AccountDetails";
+import { AccountForm } from "./AccountForm";
 
 interface AccountsTabContentProps {
   data: Account[];
@@ -23,25 +25,41 @@ interface AccountsTabContentProps {
   managementType: Account["management_type"];
 }
 
-export function AccountsTabContent({ data, isLoading }: AccountsTabContentProps) {
+export function AccountsTabContent({ data, isLoading, managementType }: AccountsTabContentProps) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [accountForDetails, setAccountForDetails] = useState<Account | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
   const handleViewAccount = (account: Account) => {
     setAccountForDetails(account);
     setIsDetailsOpen(true);
   };
 
+  const handleEditAccount = (account: Account) => {
+    setSelectedAccount(account);
+    setIsFormOpen(true);
+  };
+
+  const handleAddAccount = () => {
+    setSelectedAccount(null);
+    setIsFormOpen(true);
+  };
+
   const table = useReactTable({
     data,
     columns: columns({
       onView: handleViewAccount,
+      onEdit: handleEditAccount,
     }),
     getCoreRowModel: getCoreRowModel(),
   });
 
   return (
-    <div>
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button onClick={handleAddAccount}>Adicionar Conta</Button>
+      </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -65,7 +83,7 @@ export function AccountsTabContent({ data, isLoading }: AccountsTabContentProps)
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell colSpan={columns({ onView: handleViewAccount, onEdit: handleEditAccount }).length} className="h-24 text-center">
                   Carregando...
                 </TableCell>
               </TableRow>
@@ -84,7 +102,7 @@ export function AccountsTabContent({ data, isLoading }: AccountsTabContentProps)
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell colSpan={columns({ onView: handleViewAccount, onEdit: handleEditAccount }).length} className="h-24 text-center">
                   Nenhuma conta encontrada.
                 </TableCell>
               </TableRow>
@@ -96,6 +114,12 @@ export function AccountsTabContent({ data, isLoading }: AccountsTabContentProps)
         isOpen={isDetailsOpen}
         setIsOpen={setIsDetailsOpen}
         account={accountForDetails}
+      />
+      <AccountForm
+        isOpen={isFormOpen}
+        setIsOpen={setIsFormOpen}
+        account={selectedAccount}
+        managementType={managementType}
       />
     </div>
   );

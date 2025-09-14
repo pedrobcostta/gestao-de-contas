@@ -25,7 +25,7 @@ const keyTypeLabels: { [key: string]: string } = {
   aleatoria: "Aleatória",
 };
 
-export const pixColumns = (): ColumnDef<PixKey>[] => {
+export const pixColumns = ({ onEdit }: { onEdit: (pixKey: PixKey) => void; }): ColumnDef<PixKey>[] => {
   const queryClient = useQueryClient();
 
   const handleDelete = async (pixKeyId: string) => {
@@ -88,6 +88,9 @@ export const pixColumns = (): ColumnDef<PixKey>[] => {
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => handleCopy(pixKey.key_value)}>
                 Copiar Chave
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(pixKey)}>
+                Editar
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleDelete(pixKey.id)} className="text-red-600">

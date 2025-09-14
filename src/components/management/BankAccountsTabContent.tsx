@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   flexRender,
@@ -13,15 +14,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { BankAccount } from "@/types";
 import { bankAccountsColumns } from "./bankAccountsColumns";
 import { supabase } from "@/integrations/supabase/client";
+import { BankAccountForm } from "./BankAccountForm";
 
 interface BankAccountsTabContentProps {
   managementType: BankAccount["management_type"];
 }
 
 export function BankAccountsTabContent({ managementType }: BankAccountsTabContentProps) {
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedBankAccount, setSelectedBankAccount] = useState<BankAccount | null>(null);
+
   const { data: bankAccounts = [], isLoading } = useQuery({
     queryKey: ['bank_accounts', managementType],
     queryFn: async (): Promise<BankAccount[]> => {
@@ -35,14 +41,27 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
     }
   });
 
+  const handleEdit = (bankAccount: BankAccount) => {
+    setSelectedBankAccount(bankAccount);
+    setIsFormOpen(true);
+  };
+
+  const handleAdd = () => {
+    setSelectedBankAccount(null);
+    setIsFormOpen(true);
+  };
+
   const table = useReactTable({
     data: bankAccounts,
-    columns: bankAccountsColumns(),
+    columns: bankAccountsColumns({ onEdit: handleEdit }),
     getCoreRowModel: getCoreRowModel(),
   });
 
   return (
-    <div>
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button onClick={handleAdd}>Adicionar Conta/Cartão</Button>
+      </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -59,7 +78,7 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={bankAccountsColumns.length} className="h-24 text-center">
+                <TableCell colSpan={bankAccountsColumns({ onEdit: handleEdit }).length} className="h-24 text-center">
                   Carregando...
                 </TableCell>
               </TableRow>
@@ -75,7 +94,7 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={bankAccountsColumns.length} className="h-24 text-center">
+                <TableCell colSpan={bankAccountsColumns({ onEdit: handleEdit }).length} className="h-24 text-center">
                   Nenhuma conta encontrada.
                 </TableCell>
               </TableRow>
@@ -83,6 +102,12 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
           </TableBody>
         </Table>
       </div>
+      <BankAccountForm
+        isOpen={isFormOpen}
+        setIsOpen={setIsFormOpen}
+        bankAccount={selectedBankAccount}
+        managementType={managementType}
+      />
     </div>
   );
 }

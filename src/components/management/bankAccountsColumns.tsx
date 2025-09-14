@@ -25,7 +25,7 @@ const accountTypeLabels: { [key: string]: string } = {
   cartao_credito: "Cartão de Crédito",
 };
 
-export const bankAccountsColumns = (): ColumnDef<BankAccount>[] => {
+export const bankAccountsColumns = ({ onEdit }: { onEdit: (bankAccount: BankAccount) => void; }): ColumnDef<BankAccount>[] => {
   const queryClient = useQueryClient();
 
   const handleDelete = async (bankAccountId: string) => {
@@ -74,6 +74,9 @@ export const bankAccountsColumns = (): ColumnDef<BankAccount>[] => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onEdit(bankAccount)}>
+                Editar
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleDelete(bankAccount.id)} className="text-red-600">
                 Deletar

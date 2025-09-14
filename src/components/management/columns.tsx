@@ -27,7 +27,7 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } 
   vencido: "destructive",
 };
 
-export const columns = ({ onView }: { onView: (account: Account) => void; }): ColumnDef<Account>[] => {
+export const columns = ({ onView, onEdit }: { onView: (account: Account) => void; onEdit: (account: Account) => void; }): ColumnDef<Account>[] => {
   const queryClient = useQueryClient();
 
   const handleDelete = async (account: Account) => {
@@ -68,7 +68,7 @@ export const columns = ({ onView }: { onView: (account: Account) => void; }): Co
     {
       accessorKey: "due_date",
       header: "Vencimento",
-      cell: ({ row }) => format(new Date(row.original.due_date), "dd/MM/yyyy", { locale: ptBR }),
+      cell: ({ row }) => format(new Date(`${row.original.due_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR }),
     },
     {
       accessorKey: "total_value",
@@ -101,6 +101,9 @@ export const columns = ({ onView }: { onView: (account: Account) => void; }): Co
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => onView(account)}>
                 Visualizar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(account)}>
+                Editar
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleDelete(account)} className="text-red-600">
