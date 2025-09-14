@@ -82,7 +82,7 @@ export const columns = ({ onView, onEdit }: { onView: (account: Account) => void
       header: "Nome",
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
-          {row.original.account_type === 'recorrente' && <Repeat className="h-4 w-4 text-muted-foreground" title="Conta Recorrente" />}
+          {row.original.account_type === 'recorrente' && <span title="Conta Recorrente"><Repeat className="h-4 w-4 text-muted-foreground" /></span>}
           <span>{row.original.name}</span>
         </div>
       ),
