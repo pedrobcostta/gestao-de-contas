@@ -62,7 +62,6 @@ const formSchema = z.object({
   payment_date: z.date().optional().nullable(),
   payment_method: z.enum(["dinheiro", "pix", "boleto", "transferencia", "cartao"]).optional().nullable(),
   payment_bank_id: z.string().optional().nullable(),
-  pix_br_code: z.string().optional().nullable(),
   
   fees_and_fines: z.coerce.number().optional().nullable(),
 
@@ -237,7 +236,6 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               notes: values.notes,
               group_id: groupId,
               bill_proof_url,
-              pix_br_code: values.pix_br_code,
             };
           });
           const { error } = await supabase.from('accounts').insert(newAccounts);
@@ -473,25 +471,6 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                         <FormMessage />
                       </FormItem>
                     )} />
-                  )}
-                  {paymentMethod === 'pix' && (
-                    <FormField
-                      control={form.control}
-                      name="pix_br_code"
-                      render={({ field }) => (
-                        <FormItem className="col-span-1 md:col-span-2">
-                          <FormLabel>PIX Copia e Cola (BR Code)</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Cole o código PIX aqui..."
-                              {...field}
-                              value={field.value ?? ''}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   )}
                   <FormField control={form.control} name="payment_proof" render={({ field }) => (
                     <FormItem>
