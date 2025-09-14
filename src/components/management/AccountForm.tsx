@@ -59,6 +59,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
     resolver: zodResolver(accountSchema),
     defaultValues: {
       name: "",
+      due_date: new Date(),
       total_value: 0,
       status: "pendente",
       purchase_type: "unica",
@@ -78,7 +79,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
       if (account) {
         form.reset({
           name: account.name,
-          due_date: new Date(account.due_date),
+          due_date: new Date(`${account.due_date}T00:00:00`),
           total_value: account.total_value,
           status: account.status,
           purchase_type: account.purchase_type,
