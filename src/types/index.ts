@@ -51,3 +51,11 @@ export interface Profile {
   last_name: string | null;
   updated_at: string;
 }
+
+export interface User {
+  id: string;
+  email?: string;
+  first_name: string | null;
+  last_name: string | null;
+  created_at: string;
+}
