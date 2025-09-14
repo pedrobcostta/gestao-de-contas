@@ -213,8 +213,10 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         const newAttachmentUrls = await Promise.all(otherAttachmentsFiles.map(file => uploadFile(file, user.id)));
         const other_attachments = [...existingOtherAttachments, ...newAttachmentUrls];
 
+        const { recurrence_frequency, ...dbValues } = values;
+
         const accountData = {
-          ...values,
+          ...dbValues,
           due_date: format(values.due_date, "yyyy-MM-dd"),
           user_id: user.id,
           management_type: managementType,
@@ -225,7 +227,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
 
         const { error } = account
           ? await supabase.from("accounts").update(accountData).eq("id", account.id)
-          : await supabase.from("accounts").insert(accountData);
+          : await supabase.from("accounts").insert([accountData]);
 
         if (error) throw error;
         showSuccess(`Conta ${account ? 'atualizada' : 'criada'} com sucesso!`);
@@ -234,7 +236,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
           const nextDueDate = addMonths(values.due_date, 1);
           const newRecurrentAccount = { ...accountData, due_date: format(nextDueDate, "yyyy-MM-dd"), status: 'pendente', payment_date: null, payment_proof_url: null };
           delete (newRecurrentAccount as any).id;
-          await supabase.from('accounts').insert(newRecurrentAccount);
+          await supabase.from('accounts').insert([newRecurrentAccount]);
           showSuccess('Conta do próximo mês criada automaticamente!');
         }
       }
@@ -304,7 +306,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue />
-                      </SelectTrigger>
+                      </Trigger>
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="pendente">Pendente</SelectItem>
