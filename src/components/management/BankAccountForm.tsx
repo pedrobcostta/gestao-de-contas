@@ -127,7 +127,9 @@ export function BankAccountForm({ isOpen, setIsOpen, bankAccount, managementType
                   <FormLabel>Tipo de Conta</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="conta_corrente">Conta Corrente</SelectItem>
@@ -135,6 +137,7 @@ export function BankAccountForm({ isOpen, setIsOpen, bankAccount, managementType
                       <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -144,7 +147,9 @@ export function BankAccountForm({ isOpen, setIsOpen, bankAccount, managementType
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Nome da Conta/Cartão</FormLabel>
-                  <FormControl><Input placeholder="Ex: Conta Principal" {...field} /></FormControl>
+                  <FormControl>
+                    <Input placeholder="Ex: Conta Principal" {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -155,7 +160,9 @@ export function BankAccountForm({ isOpen, setIsOpen, bankAccount, managementType
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Nome do Banco</FormLabel>
-                  <FormControl><Input placeholder="Ex: Banco do Brasil" {...field} /></FormControl>
+                  <FormControl>
+                    <Input placeholder="Ex: Banco do Brasil" {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -168,7 +175,10 @@ export function BankAccountForm({ isOpen, setIsOpen, bankAccount, managementType
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Agência</FormLabel>
-                      <FormControl><Input placeholder="0001" {...field} /></FormControl>
+                      <FormControl>
+                        <Input placeholder="0001" {...field} />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -178,7 +188,10 @@ export function BankAccountForm({ isOpen, setIsOpen, bankAccount, managementType
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Número da Conta</FormLabel>
-                      <FormControl><Input placeholder="12345-6" {...field} /></FormControl>
+                      <FormControl>
+                        <Input placeholder="12345-6" {...field} />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -192,7 +205,10 @@ export function BankAccountForm({ isOpen, setIsOpen, bankAccount, managementType
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Limite do Cartão</FormLabel>
-                      <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...field} />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -202,7 +218,10 @@ export function BankAccountForm({ isOpen, setIsOpen, bankAccount, managementType
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Dia de Fechamento</FormLabel>
-                      <FormControl><Input type="number" {...field} /></FormControl>
+                      <FormControl>
+                        <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -212,7 +231,10 @@ export function BankAccountForm({ isOpen, setIsOpen, bankAccount, managementType
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Dia de Vencimento</FormLabel>
-                      <FormControl><Input type="number" {...field} /></FormControl>
+                      <FormControl>
+                        <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
