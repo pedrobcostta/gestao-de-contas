@@ -63,44 +63,7 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
   }, [accounts, statusFilter, typeFilter]);
 
   const processedData = useMemo(() => {
-    const installmentsByGroup = new Map<string, Account[]>();
-    const otherAccounts: Account[] = [];
-
-    for (const account of filteredAccounts) {
-      if (account.account_type === 'parcelada' && account.group_id) {
-        if (!installmentsByGroup.has(account.group_id)) {
-          installmentsByGroup.set(account.group_id, []);
-        }
-        installmentsByGroup.get(account.group_id)!.push(account);
-      } else {
-        otherAccounts.push(account);
-      }
-    }
-
-    const groupedAccounts: (Account & { subRows?: Account[], isGroup?: boolean, installment_summary?: string })[] = [];
-    for (const [groupId, installments] of installmentsByGroup.entries()) {
-      installments.sort((a, b) => (a.installment_current || 0) - (b.installment_current || 0));
-      const firstInstallment = installments[0];
-      const parentName = firstInstallment.name.replace(/ \d+\/\d+$/, '').trim();
-      const totalValue = installments.reduce((sum, inst) => sum + inst.total_value, 0);
-      const paidCount = installments.filter(i => i.status === 'pago').length;
-
-      const parentRow: any = {
-        id: groupId,
-        name: parentName,
-        due_date: firstInstallment.due_date,
-        total_value: totalValue,
-        status: 'agrupado',
-        account_type: 'parcelada',
-        subRows: installments,
-        management_type: firstInstallment.management_type,
-        isGroup: true,
-        installment_summary: `${paidCount}/${installments.length} pagas`,
-      };
-      groupedAccounts.push(parentRow);
-    }
-
-    return [...otherAccounts, ...groupedAccounts].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+    return filteredAccounts.sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
   }, [filteredAccounts]);
 
   const summary = accounts.reduce((acc, account) => {

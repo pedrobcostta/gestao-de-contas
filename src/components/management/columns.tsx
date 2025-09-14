@@ -1,7 +1,7 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal, Repeat, ChevronDown, ChevronRight } from "lucide-react"
+import { MoreHorizontal, Repeat } from "lucide-react"
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -27,20 +27,14 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } 
   vencido: "destructive",
 };
 
-export const columns = ({ onView, onEdit }: { onView: (account: Account) => void; onEdit: (account: Account) => void; }): ColumnDef<Account & { isGroup?: boolean, subRows?: Account[], installment_summary?: string }>[] => {
+export const columns = ({ onView, onEdit }: { onView: (account: Account) => void; onEdit: (account: Account) => void; }): ColumnDef<Account>[] => {
   const queryClient = useQueryClient();
 
-  const handleDelete = async (account: Account & { isGroup?: boolean, subRows?: Account[] }) => {
+  const handleDelete = async (account: Account) => {
     let error = null;
     let successMessage = "";
 
-    if (account.isGroup) {
-      if (confirm(`Tem certeza que deseja deletar TODAS as ${account.subRows?.length} parcelas relacionadas a esta compra?`)) {
-        const { error: deleteError } = await supabase.from('accounts').delete().eq('group_id', account.id);
-        error = deleteError;
-        successMessage = "Todas as parcelas foram deletadas com sucesso!";
-      }
-    } else if (account.group_id && account.account_type === 'parcelada') {
+    if (account.group_id && account.account_type === 'parcelada') {
       if (confirm("Esta é uma conta parcelada. Deseja deletar TODAS as parcelas relacionadas a esta compra?")) {
         const { error: deleteError } = await supabase.from('accounts').delete().eq('group_id', account.group_id);
         error = deleteError;
@@ -68,22 +62,6 @@ export const columns = ({ onView, onEdit }: { onView: (account: Account) => void
 
   return [
     {
-      id: 'expander',
-      header: () => null,
-      cell: ({ row }) => {
-        return row.getCanExpand() ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={row.getToggleExpandedHandler()}
-            className="w-8 h-8 p-0"
-          >
-            {row.getIsExpanded() ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </Button>
-        ) : <div className="w-8"></div>;
-      },
-    },
-    {
       accessorKey: "name",
       header: "Nome",
       cell: ({ row }) => (
@@ -104,38 +82,10 @@ export const columns = ({ onView, onEdit }: { onView: (account: Account) => void
       cell: ({ row }) => formatCurrency(row.original.total_value),
     },
     {
-      id: "installment",
-      header: "Parcela",
-      cell: ({ row }) => {
-        const { account_type, installment_current, installments_total, isGroup, installment_summary } = row.original;
-        if (isGroup) {
-          return <Badge variant="outline">{installment_summary}</Badge>;
-        }
-        if (account_type === 'parcelada' && installment_current && installments_total) {
-          return `${installment_current} / ${installments_total}`;
-        }
-        return null;
-      }
-    },
-    {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
         const account = row.original;
-        if (account.isGroup) {
-          const paidCount = account.subRows?.filter(r => r.status === 'pago').length || 0;
-          const overdueCount = account.subRows?.filter(r => r.status === 'vencido').length || 0;
-          const pendingCount = (account.subRows?.length || 0) - paidCount - overdueCount;
-          
-          const summaries = [];
-          if (overdueCount > 0) summaries.push(`${overdueCount} vencida(s)`);
-          if (pendingCount > 0) summaries.push(`${pendingCount} pendente(s)`);
-          if (paidCount > 0) summaries.push(`${paidCount} paga(s)`);
-
-          if (summaries.length === 0) return null;
-
-          return <span className="text-xs text-muted-foreground whitespace-nowrap">{summaries.join(', ')}</span>;
-        }
         return (
           <Badge variant={statusVariant[account.status] || "secondary"}>
             {account.status}
@@ -147,29 +97,6 @@ export const columns = ({ onView, onEdit }: { onView: (account: Account) => void
       id: "actions",
       cell: ({ row }) => {
         const account = row.original;
-  
-        if (account.isGroup) {
-          return (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Abrir menu</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Ações do Grupo</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => onView(account.subRows![0])}>
-                  Visualizar Resumo
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleDelete(account)} className="text-red-600">
-                  Deletar Todas Parcelas
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )
-        }
   
         return (
           <DropdownMenu>
