@@ -44,3 +44,10 @@ export interface BankAccount {
   card_due_day: number | null;
   created_at: string;
 }
+
+export interface Profile {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  updated_at: string;
+}
