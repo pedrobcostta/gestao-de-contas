@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Account } from "@/types";
@@ -65,56 +65,112 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
     },
   });
 
+  const [billProofFile, setBillProofFile] = useState<File | null>(null);
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [otherAttachmentsFiles, setOtherAttachmentsFiles] = useState<File[]>([]);
+  const [existingOtherAttachments, setExistingOtherAttachments] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const status = form.watch("status");
+
   useEffect(() => {
-    if (account) {
-      form.reset({
-        name: account.name,
-        due_date: new Date(account.due_date),
-        total_value: account.total_value,
-        status: account.status,
-        purchase_type: account.purchase_type,
-      });
-    } else {
-      form.reset({
-        name: "",
-        due_date: new Date(),
-        total_value: 0,
-        status: "pendente",
-        purchase_type: "unica",
-      });
+    if (isOpen) {
+      if (account) {
+        form.reset({
+          name: account.name,
+          due_date: new Date(account.due_date),
+          total_value: account.total_value,
+          status: account.status,
+          purchase_type: account.purchase_type,
+        });
+        setExistingOtherAttachments(account.other_attachments || []);
+      } else {
+        form.reset({
+          name: "",
+          due_date: new Date(),
+          total_value: 0,
+          status: "pendente",
+          purchase_type: "unica",
+        });
+        setExistingOtherAttachments([]);
+      }
+      setBillProofFile(null);
+      setPaymentProofFile(null);
+      setOtherAttachmentsFiles([]);
     }
-  }, [account, form]);
+  }, [account, form, isOpen]);
+
+  const handleRemoveExistingAttachment = (index: number) => {
+    setExistingOtherAttachments(prev => prev.filter((_, i) => i !== index));
+  };
 
   const onSubmit = async (values: z.infer<typeof accountSchema>) => {
+    setIsUploading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       showError("Você precisa estar logado.");
+      setIsUploading(false);
       return;
     }
 
-    const accountData = {
-      ...values,
-      due_date: format(values.due_date, "yyyy-MM-dd"),
-      user_id: user.id,
-      management_type: managementType,
+    const uploadFile = async (file: File, userId: string): Promise<string> => {
+      const filePath = `${userId}/${Date.now()}-${file.name}`;
+      const { error } = await supabase.storage.from('attachments').upload(filePath, file);
+      if (error) throw error;
+      const { data } = supabase.storage.from('attachments').getPublicUrl(filePath);
+      return data.publicUrl;
     };
 
-    const { error } = account
-      ? await supabase.from("accounts").update(accountData).eq("id", account.id)
-      : await supabase.from("accounts").insert(accountData);
+    try {
+      let bill_proof_url = account?.bill_proof_url || null;
+      if (billProofFile) {
+        bill_proof_url = await uploadFile(billProofFile, user.id);
+      }
 
-    if (error) {
-      showError(`Erro ao salvar conta: ${error.message}`);
-    } else {
-      showSuccess(`Conta ${account ? 'atualizada' : 'criada'} com sucesso!`);
-      queryClient.invalidateQueries({ queryKey: ['accounts', managementType] });
-      setIsOpen(false);
+      let payment_proof_url = account?.payment_proof_url || null;
+      if (paymentProofFile && values.status === 'pago') {
+        payment_proof_url = await uploadFile(paymentProofFile, user.id);
+      } else if (values.status !== 'pago') {
+        payment_proof_url = null;
+      }
+
+      const newAttachmentUrls = await Promise.all(
+        otherAttachmentsFiles.map(file => uploadFile(file, user.id))
+      );
+      
+      const other_attachments = [...existingOtherAttachments, ...newAttachmentUrls];
+
+      const accountData = {
+        ...values,
+        due_date: format(values.due_date, "yyyy-MM-dd"),
+        user_id: user.id,
+        management_type: managementType,
+        bill_proof_url,
+        payment_proof_url,
+        other_attachments,
+      };
+
+      const { error } = account
+        ? await supabase.from("accounts").update(accountData).eq("id", account.id)
+        : await supabase.from("accounts").insert(accountData);
+
+      if (error) {
+        showError(`Erro ao salvar conta: ${error.message}`);
+      } else {
+        showSuccess(`Conta ${account ? 'atualizada' : 'criada'} com sucesso!`);
+        queryClient.invalidateQueries({ queryKey: ['accounts', managementType] });
+        setIsOpen(false);
+      }
+    } catch (error: any) {
+      showError(`Erro no upload: ${error.message}`);
+    } finally {
+      setIsUploading(false);
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{account ? "Editar Conta" : "Adicionar Nova Conta"}</DialogTitle>
           <DialogDescription>
@@ -123,114 +179,75 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
+            {/* Fields from before */}
+            <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Nome da Conta</FormLabel> <FormControl> <Input placeholder="Ex: Conta de Luz" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={form.control} name="total_value" render={({ field }) => ( <FormItem> <FormLabel>Valor Total</FormLabel> <FormControl> <Input type="number" step="0.01" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={form.control} name="due_date" render={({ field }) => ( <FormItem className="flex flex-col"> <FormLabel>Data de Vencimento</FormLabel> <Popover> <PopoverTrigger asChild> <FormControl> <Button variant={"outline"} className={cn( "w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground" )}> {field.value ? ( format(field.value, "PPP", { locale: ptBR }) ) : ( <span>Escolha uma data</span> )} <CalendarIcon className="ml-auto h-4 w-4 opacity-50" /> </Button> </FormControl> </PopoverTrigger> <PopoverContent className="w-auto p-0" align="start"> <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /> </PopoverContent> </Popover> <FormMessage /> </FormItem> )}/>
+            <FormField control={form.control} name="status" render={({ field }) => ( <FormItem> <FormLabel>Status</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Selecione o status" /> </SelectTrigger> </FormControl> <SelectContent> <SelectItem value="pendente">Pendente</SelectItem> <SelectItem value="pago">Pago</SelectItem> <SelectItem value="vencido">Vencido</SelectItem> </SelectContent> </Select> <FormMessage /> </FormItem> )}/>
+            <FormField control={form.control} name="purchase_type" render={({ field }) => ( <FormItem> <FormLabel>Tipo de Compra</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Selecione o tipo" /> </SelectTrigger> </FormControl> <SelectContent> <SelectItem value="unica">Única</SelectItem> <SelectItem value="parcelada">Parcelada</SelectItem> </SelectContent> </Select> <FormMessage /> </FormItem> )}/>
+            
+            {/* Attachments Section */}
+            <div className="space-y-4 pt-4 border-t">
+              <h3 className="text-lg font-medium">Anexos</h3>
+              <FormItem>
+                <FormLabel>Fatura / Conta</FormLabel>
+                {account?.bill_proof_url && !billProofFile && (
+                  <div className="text-sm text-blue-500 underline">
+                    <a href={account.bill_proof_url} target="_blank" rel="noopener noreferrer">Ver fatura atual</a>
+                  </div>
+                )}
+                <FormControl>
+                  <Input type="file" accept="image/*,application/pdf" onChange={(e) => setBillProofFile(e.target.files?.[0] || null)} />
+                </FormControl>
+              </FormItem>
+
+              {status === 'pago' && (
                 <FormItem>
-                  <FormLabel>Nome da Conta</FormLabel>
+                  <FormLabel>Comprovante de Pagamento</FormLabel>
+                  {account?.payment_proof_url && !paymentProofFile && (
+                    <div className="text-sm text-blue-500 underline">
+                      <a href={account.payment_proof_url} target="_blank" rel="noopener noreferrer">Ver comprovante atual</a>
+                    </div>
+                  )}
                   <FormControl>
-                    <Input placeholder="Ex: Conta de Luz" {...field} />
+                    <Input type="file" accept="image/*,application/pdf" onChange={(e) => setPaymentProofFile(e.target.files?.[0] || null)} />
                   </FormControl>
-                  <FormMessage />
                 </FormItem>
               )}
-            />
-            <FormField
-              control={form.control}
-              name="total_value"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Valor Total</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="0.01" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="due_date"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Data de Vencimento</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP", { locale: ptBR })
-                          ) : (
-                            <span>Escolha uma data</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="pendente">Pendente</SelectItem>
-                      <SelectItem value="pago">Pago</SelectItem>
-                      <SelectItem value="vencido">Vencido</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="purchase_type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipo de Compra</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o tipo" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="unica">Única</SelectItem>
-                      <SelectItem value="parcelada">Parcelada</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit">Salvar</Button>
+
+              <div className="space-y-2">
+                <FormLabel>Outros Anexos</FormLabel>
+                <div className="space-y-2">
+                  {existingOtherAttachments.map((url, index) => (
+                    <div key={index} className="flex items-center justify-between text-sm p-2 border rounded-md">
+                      <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline truncate pr-2">Anexo salvo {index + 1}</a>
+                      <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveExistingAttachment(index)}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                  ))}
+                  {otherAttachmentsFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between text-sm p-2 border rounded-md">
+                      <span className="truncate pr-2">{file.name}</span>
+                      <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setOtherAttachmentsFiles(prev => prev.filter((_, i) => i !== index))}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <FormControl>
+                  <Input type="file" multiple accept="image/*,application/pdf" className="mt-2" onChange={(e) => {
+                    if (e.target.files) {
+                      setOtherAttachmentsFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+                    }
+                  }} />
+                </FormControl>
+              </div>
+            </div>
+
+            <Button type="submit" disabled={isUploading} className="w-full">
+              {isUploading ? 'Salvando...' : 'Salvar'}
+            </Button>
           </form>
         </Form>
       </DialogContent>

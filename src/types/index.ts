@@ -12,6 +12,7 @@ export interface Account {
   installment_value: number | null;
   payment_proof_url: string | null;
   bill_proof_url: string | null;
+  other_attachments: string[] | null;
   payment_method: string | null;
   notes: string | null;
   status: "pago" | "pendente" | "vencido";
