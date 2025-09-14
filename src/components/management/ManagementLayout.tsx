@@ -33,6 +33,8 @@ const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 
 const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [statusFilter, setStatusFilter] = useState('todas');
+  const [typeFilter, setTypeFilter] = useState('todas');
 
   const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
   const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
@@ -52,11 +54,19 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
     }
   });
 
+  const filteredAccounts = useMemo(() => {
+    return accounts.filter(account => {
+      const statusMatch = statusFilter === 'todas' || account.status === statusFilter;
+      const typeMatch = typeFilter === 'todas' || account.account_type === typeFilter;
+      return statusMatch && typeMatch;
+    });
+  }, [accounts, statusFilter, typeFilter]);
+
   const processedData = useMemo(() => {
     const installmentsByGroup = new Map<string, Account[]>();
     const otherAccounts: Account[] = [];
 
-    for (const account of accounts) {
+    for (const account of filteredAccounts) {
       if (account.account_type === 'parcelada' && account.group_id) {
         if (!installmentsByGroup.has(account.group_id)) {
           installmentsByGroup.set(account.group_id, []);
@@ -90,7 +100,7 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
     }
 
     return [...otherAccounts, ...groupedAccounts].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
-  }, [accounts]);
+  }, [filteredAccounts]);
 
   const summary = accounts.reduce((acc, account) => {
     if (account.status === 'pago') {
@@ -107,9 +117,9 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold">{title}</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap justify-start md:justify-end">
           <Select value={String(selectedMonth)} onValueChange={(value) => setSelectedMonth(Number(value))}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Mês" />
             </SelectTrigger>
             <SelectContent>
@@ -117,11 +127,33 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
             </SelectContent>
           </Select>
           <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
-            <SelectTrigger className="w-[120px]">
+            <SelectTrigger className="w-[100px]">
               <SelectValue placeholder="Ano" />
             </SelectTrigger>
             <SelectContent>
               {years.map(year => <SelectItem key={year} value={String(year)}>{year}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Filtrar por Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todos os Status</SelectItem>
+              <SelectItem value="pendente">Pendente</SelectItem>
+              <SelectItem value="pago">Pago</SelectItem>
+              <SelectItem value="vencido">Vencido</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Filtrar por Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todos os Tipos</SelectItem>
+              <SelectItem value="unica">Única</SelectItem>
+              <SelectItem value="parcelada">Parcelada</SelectItem>
+              <SelectItem value="recorrente">Recorrente</SelectItem>
             </SelectContent>
           </Select>
         </div>
