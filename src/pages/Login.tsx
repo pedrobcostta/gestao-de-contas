@@ -27,6 +27,7 @@ const Login = () => {
           view="sign_in"
           theme="light"
           showLinks={false}
+          providers={[]}
         />
       </div>
     </div>
