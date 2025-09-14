@@ -19,6 +19,7 @@ export interface Account {
   fees_and_fines: number | null;
   created_at: string;
   is_recurrent: boolean;
+  group_id: string | null;
 }
 
 export interface PixKey {
