@@ -147,6 +147,97 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
     setExistingOtherAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
+  const uploadFile = async (file: File, userId: string): Promise<string> => {
+    const filePath = `${userId}/${Date.now()}-${file.name}`;
+    const { error } = await supabase.storage.from('attachments').upload(filePath, file);
+    if (error) throw new Error(`Falha no upload do arquivo: ${error.message}`);
+    const { data } = supabase.storage.from('attachments').getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const handleCreateAccount = async (values: z.infer<typeof accountSchema>, userId: string, urls: Record<string, any>) => {
+    if (values.purchase_type === 'parcelada') {
+      const groupId = crypto.randomUUID();
+      const installmentsToCreate = [];
+      const installmentValue = values.total_value / values.installments_total!;
+      const startDate = values.due_date;
+
+      for (let i = 0; i < values.installments_total!; i++) {
+        let dueDate;
+        switch (values.recurrence_frequency) {
+          case 'weekly': dueDate = addWeeks(startDate, i); break;
+          case 'bimonthly': dueDate = addMonths(startDate, i * 2); break;
+          case 'quarterly': dueDate = addQuarters(startDate, i); break;
+          default: dueDate = addMonths(startDate, i);
+        }
+
+        installmentsToCreate.push({
+          user_id: userId,
+          management_type: managementType,
+          name: `${values.name} ${i + 1}/${values.installments_total}`,
+          due_date: format(dueDate, "yyyy-MM-dd"),
+          total_value: installmentValue,
+          status: 'pendente',
+          purchase_type: 'parcelada',
+          is_recurrent: false,
+          notes: values.notes,
+          payment_method: values.payment_method,
+          group_id: groupId,
+          installments_total: values.installments_total,
+          installment_current: i + 1,
+          installment_value: installmentValue,
+          ...urls,
+        });
+      }
+
+      const { error } = await supabase.from('accounts').insert(installmentsToCreate);
+      if (error) throw error;
+      showSuccess(`${values.installments_total} parcelas criadas com sucesso!`);
+    } else {
+      const { recurrence_frequency, ...dbValues } = values;
+      const accountData = {
+        ...dbValues,
+        due_date: format(values.due_date, "yyyy-MM-dd"),
+        user_id: userId,
+        management_type: managementType,
+        ...urls,
+      };
+      const { error } = await supabase.from("accounts").insert([accountData]);
+      if (error) throw error;
+      showSuccess(`Conta criada com sucesso!`);
+    }
+  };
+
+  const handleUpdateAccount = async (values: z.infer<typeof accountSchema>, userId: string, urls: Record<string, any>) => {
+    if (!account) return;
+    const { recurrence_frequency, ...dbValues } = values;
+    const accountData = {
+      ...dbValues,
+      due_date: format(values.due_date, "yyyy-MM-dd"),
+      user_id: userId,
+      management_type: managementType,
+      ...urls,
+    };
+
+    const { error } = await supabase.from("accounts").update(accountData).eq("id", account.id);
+    if (error) throw error;
+    showSuccess(`Conta atualizada com sucesso!`);
+
+    if (values.is_recurrent && values.status === 'pago' && !account.is_recurrent) {
+      const nextDueDate = addMonths(values.due_date, 1);
+      const { id, ...newRecurrentAccountData } = accountData;
+      const newRecurrentAccount = {
+        ...newRecurrentAccountData,
+        due_date: format(nextDueDate, "yyyy-MM-dd"),
+        status: 'pendente',
+        payment_date: null,
+        payment_proof_url: null,
+      };
+      await supabase.from('accounts').insert([newRecurrentAccount]);
+      showSuccess('Conta recorrente do próximo mês criada automaticamente!');
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof accountSchema>) => {
     setIsUploading(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -157,94 +248,30 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
     }
 
     try {
-      if (values.purchase_type === 'parcelada' && !account) {
-        const groupId = crypto.randomUUID();
-        const installmentsToCreate = [];
-        const installmentValue = values.total_value / values.installments_total!;
-        const startDate = values.due_date;
+      let bill_proof_url = account?.bill_proof_url || null;
+      if (billProofFile) bill_proof_url = await uploadFile(billProofFile, user.id);
 
-        for (let i = 0; i < values.installments_total!; i++) {
-          let dueDate;
-          switch (values.recurrence_frequency) {
-            case 'weekly': dueDate = addWeeks(startDate, i); break;
-            case 'bimonthly': dueDate = addMonths(startDate, i * 2); break;
-            case 'quarterly': dueDate = addQuarters(startDate, i); break;
-            default: dueDate = addMonths(startDate, i);
-          }
+      let payment_proof_url = account?.payment_proof_url || null;
+      if (paymentProofFile && values.status === 'pago') {
+        payment_proof_url = await uploadFile(paymentProofFile, user.id);
+      } else if (values.status !== 'pago') {
+        payment_proof_url = null;
+      }
 
-          installmentsToCreate.push({
-            user_id: user.id,
-            management_type: managementType,
-            name: `${values.name} ${i + 1}/${values.installments_total}`,
-            due_date: format(dueDate, "yyyy-MM-dd"),
-            total_value: installmentValue,
-            status: 'pendente',
-            purchase_type: 'parcelada',
-            is_recurrent: false,
-            notes: values.notes,
-            payment_method: values.payment_method,
-            group_id: groupId,
-            installments_total: values.installments_total,
-            installment_current: i + 1,
-            installment_value: installmentValue,
-          });
-        }
+      const newAttachmentUrls = await Promise.all(otherAttachmentsFiles.map(file => uploadFile(file, user.id)));
+      const other_attachments = [...existingOtherAttachments, ...newAttachmentUrls];
 
-        const { error } = await supabase.from('accounts').insert(installmentsToCreate);
-        if (error) throw error;
-        showSuccess(`${values.installments_total} parcelas criadas com sucesso!`);
+      const fileUrls = { bill_proof_url, payment_proof_url, other_attachments };
 
+      if (account) {
+        await handleUpdateAccount(values, user.id, fileUrls);
       } else {
-        const uploadFile = async (file: File, userId: string): Promise<string> => {
-          const filePath = `${userId}/${Date.now()}-${file.name}`;
-          const { error } = await supabase.storage.from('attachments').upload(filePath, file);
-          if (error) throw error;
-          const { data } = supabase.storage.from('attachments').getPublicUrl(filePath);
-          return data.publicUrl;
-        };
-
-        let bill_proof_url = account?.bill_proof_url || null;
-        if (billProofFile) bill_proof_url = await uploadFile(billProofFile, user.id);
-
-        let payment_proof_url = account?.payment_proof_url || null;
-        if (paymentProofFile && values.status === 'pago') payment_proof_url = await uploadFile(paymentProofFile, user.id);
-        else if (values.status !== 'pago') payment_proof_url = null;
-
-        const newAttachmentUrls = await Promise.all(otherAttachmentsFiles.map(file => uploadFile(file, user.id)));
-        const other_attachments = [...existingOtherAttachments, ...newAttachmentUrls];
-
-        const { recurrence_frequency, ...dbValues } = values;
-
-        const accountData = {
-          ...dbValues,
-          due_date: format(values.due_date, "yyyy-MM-dd"),
-          user_id: user.id,
-          management_type: managementType,
-          bill_proof_url,
-          payment_proof_url,
-          other_attachments,
-        };
-
-        const { error } = account
-          ? await supabase.from("accounts").update(accountData).eq("id", account.id)
-          : await supabase.from("accounts").insert([accountData]);
-
-        if (error) throw error;
-        showSuccess(`Conta ${account ? 'atualizada' : 'criada'} com sucesso!`);
-
-        if (values.is_recurrent && values.status === 'pago' && !account?.is_recurrent) {
-          const nextDueDate = addMonths(values.due_date, 1);
-          const newRecurrentAccount = { ...accountData, due_date: format(nextDueDate, "yyyy-MM-dd"), status: 'pendente', payment_date: null, payment_proof_url: null };
-          delete (newRecurrentAccount as any).id;
-          await supabase.from('accounts').insert([newRecurrentAccount]);
-          showSuccess('Conta do próximo mês criada automaticamente!');
-        }
+        await handleCreateAccount(values, user.id, fileUrls);
       }
 
       queryClient.invalidateQueries({ queryKey: ['accounts', managementType] });
       setIsOpen(false);
-    } catch (error: any)
-      {
+    } catch (error: any) {
       showError(`Erro: ${error.message}`);
     } finally {
       setIsUploading(false);
@@ -303,12 +330,12 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={purchaseType === 'parcelada' && !account}>
-                  <FormControl>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={purchaseType === 'parcelada' && !account}>
+                    <FormControl>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
-                  </FormControl>
+                    </FormControl>
                     <SelectContent>
                       <SelectItem value="pendente">Pendente</SelectItem>
                       <SelectItem value="pago">Pago</SelectItem>
@@ -325,12 +352,12 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Banco de Pagamento</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione um banco" />
                       </SelectTrigger>
-                  </FormControl>
+                    </FormControl>
                     <SelectContent>
                       {bankAccounts.map(b => <SelectItem key={b.id} value={b.account_name}>{b.account_name}</SelectItem>)}
                     </SelectContent>
@@ -346,12 +373,12 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo de Compra</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={!!account}>
-                  <FormControl>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={!!account}>
+                    <FormControl>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
-                  </FormControl>
+                    </FormControl>
                     <SelectContent>
                       <SelectItem value="unica">Única</SelectItem>
                       <SelectItem value="parcelada">Parcelada</SelectItem>
@@ -371,12 +398,12 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Frequência</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
-                      </FormControl>
+                        </FormControl>
                         <SelectContent>
                           <SelectItem value="weekly">Semanal</SelectItem>
                           <SelectItem value="monthly">Mensal</SelectItem>

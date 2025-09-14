@@ -30,12 +30,32 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } 
 export const columns = ({ onEdit, onView }: { onEdit: (account: Account) => void; onView: (account: Account) => void; }): ColumnDef<Account>[] => {
   const queryClient = useQueryClient();
 
-  const handleDelete = async (accountId: string) => {
-    const { error } = await supabase.from('accounts').delete().eq('id', accountId);
-    if (error) {
-      showError("Erro ao deletar conta.");
+  const handleDelete = async (account: Account) => {
+    let error = null;
+    let successMessage = "";
+
+    if (account.group_id && account.purchase_type === 'parcelada') {
+      if (confirm("Esta é uma conta parcelada. Deseja deletar TODAS as parcelas relacionadas a esta compra?")) {
+        const { error: deleteError } = await supabase.from('accounts').delete().eq('group_id', account.group_id);
+        error = deleteError;
+        successMessage = "Todas as parcelas foram deletadas com sucesso!";
+      } else {
+        const { error: deleteError } = await supabase.from('accounts').delete().eq('id', account.id);
+        error = deleteError;
+        successMessage = "Apenas esta parcela foi deletada com sucesso!";
+      }
     } else {
-      showSuccess("Conta deletada com sucesso!");
+      if (confirm(`Tem certeza que deseja deletar a conta "${account.name}"?`)) {
+        const { error: deleteError } = await supabase.from('accounts').delete().eq('id', account.id);
+        error = deleteError;
+        successMessage = "Conta deletada com sucesso!";
+      }
+    }
+
+    if (error) {
+      showError(`Erro ao deletar: ${error.message}`);
+    } else if (successMessage) {
+      showSuccess(successMessage);
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
     }
   };
@@ -86,7 +106,7 @@ export const columns = ({ onEdit, onView }: { onEdit: (account: Account) => void
                 Editar
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleDelete(account.id)} className="text-red-600">
+              <DropdownMenuItem onClick={() => handleDelete(account)} className="text-red-600">
                 Deletar
               </DropdownMenuItem>
             </DropdownMenuContent>
