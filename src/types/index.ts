@@ -18,3 +18,14 @@ export interface Account {
   fees_and_fines: number | null;
   created_at: string;
 }
+
+export interface PixKey {
+  id: string;
+  user_id: string;
+  management_type: "pessoal" | "casa" | "pai" | "mae";
+  key_type: "cpf_cnpj" | "celular" | "email" | "aleatoria";
+  key_value: string;
+  bank_name: string | null;
+  owner_name: string | null;
+  created_at: string;
+}

@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Account } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { AccountsTabContent } from "./AccountsTabContent";
+import { PixTabContent } from "./PixTabContent";
 
 interface ManagementLayoutProps {
   title: string;
@@ -71,7 +72,7 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(summary.overdue)}</div>
             <p className="text-xs text-muted-foreground">Total de contas vencidas</p>
-          </CardContent>
+          </C</CardContent>
         </Card>
       </div>
 
@@ -79,7 +80,7 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
       <Tabs defaultValue="contas" className="space-y-4">
         <TabsList>
           <TabsTrigger value="contas">Gestão de Contas</TabsTrigger>
-          <TabsTrigger value="pix" disabled>Gestão de PIX</TabsTrigger>
+          <TabsTrigger value="pix">Gestão de PIX</TabsTrigger>
           <TabsTrigger value="bancos" disabled>Gestão de Bancos</TabsTrigger>
           <TabsTrigger value="pagas" disabled>Contas Pagas</TabsTrigger>
           <TabsTrigger value="relatorios" disabled>Relatórios</TabsTrigger>
@@ -92,6 +93,16 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
             </CardHeader>
             <CardContent>
               <AccountsTabContent data={accounts} isLoading={isLoading} managementType={managementType} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="pix">
+          <Card>
+            <CardHeader>
+              <CardTitle>Chaves PIX</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PixTabContent managementType={managementType} />
             </CardContent>
           </Card>
         </TabsContent>
