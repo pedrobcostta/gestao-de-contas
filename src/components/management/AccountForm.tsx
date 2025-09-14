@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon, Loader2 } from "lucide-react";
@@ -36,10 +36,10 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { Account } from "@/types";
+import { Account, BankAccount } from "@/types";
 import { showError, showSuccess } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthProvider";
 import { CurrencyInput } from "@/components/CurrencyInput";
@@ -49,12 +49,14 @@ const formSchema = z.object({
   total_value: z.coerce.number().min(0.01, "O valor deve ser maior que zero."),
   due_date: z.date({ required_error: "A data de vencimento é obrigatória." }),
   status: z.enum(["pendente", "pago", "vencido"]),
-  purchase_type: z.enum(["unica", "parcelada"]),
+  account_type: z.enum(["unica", "parcelada", "recorrente"]),
   installments_total: z.coerce.number().optional(),
+  recurrence_end_date: z.date().optional().nullable(),
+  recurrence_indefinite: z.boolean().default(false),
   payment_date: z.date().optional().nullable(),
-  payment_method: z.string().optional().nullable(),
+  payment_method: z.enum(["dinheiro", "pix", "boleto", "transferencia", "cartao"]).optional().nullable(),
+  payment_bank_id: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
-  is_recurrent: z.boolean().default(false),
   bill_proof: z.instanceof(FileList).optional(),
   payment_proof: z.instanceof(FileList).optional(),
 });
@@ -92,13 +94,28 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      is_recurrent: false,
-      purchase_type: "unica",
+      account_type: "unica",
       status: "pendente",
+      recurrence_indefinite: true,
     },
   });
 
-  const purchaseType = form.watch("purchase_type");
+  const { data: bankAccounts = [] } = useQuery({
+    queryKey: ['bank_accounts', managementType],
+    queryFn: async (): Promise<BankAccount[]> => {
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .select('*')
+        .eq('management_type', managementType);
+      
+      if (error) throw new Error(error.message);
+      return data || [];
+    }
+  });
+
+  const accountType = form.watch("account_type");
+  const status = form.watch("status");
+  const paymentMethod = form.watch("payment_method");
 
   useEffect(() => {
     if (account) {
@@ -106,7 +123,9 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         ...account,
         due_date: new Date(`${account.due_date}T00:00:00`),
         payment_date: account.payment_date ? new Date(`${account.payment_date}T00:00:00`) : null,
-        total_value: account.purchase_type === 'parcelada' ? account.installment_value : account.total_value,
+        total_value: account.account_type === 'parcelada' ? account.installment_value : account.total_value,
+        recurrence_end_date: account.recurrence_end_date ? new Date(`${account.recurrence_end_date}T00:00:00`) : null,
+        recurrence_indefinite: !account.recurrence_end_date,
       });
     } else {
       form.reset({
@@ -114,12 +133,12 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         total_value: 0,
         due_date: new Date(),
         status: "pendente",
-        purchase_type: "unica",
-        installments_total: 1,
+        account_type: "unica",
+        installments_total: 2,
         payment_date: null,
-        payment_method: "",
+        payment_method: undefined,
         notes: "",
-        is_recurrent: false,
+        recurrence_indefinite: true,
       });
     }
   }, [account, form]);
@@ -139,6 +158,8 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         payment_proof_url = await uploadFile(values.payment_proof[0], session.user.id);
       }
 
+      const recurrence_end_date = values.account_type === 'recorrente' && !values.recurrence_indefinite ? format(values.recurrence_end_date!, "yyyy-MM-dd") : null;
+
       if (account) { // EDIT
         const { error } = await supabase
           .from("accounts")
@@ -147,15 +168,16 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
             due_date: format(values.due_date, "yyyy-MM-dd"),
             payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null,
             total_value: values.total_value,
-            installment_value: values.total_value,
+            installment_value: values.account_type === 'parcelada' ? values.total_value : null,
             bill_proof_url,
             payment_proof_url,
+            recurrence_end_date,
           })
           .eq("id", account.id);
         if (error) throw error;
         showSuccess("Conta atualizada com sucesso!");
       } else { // CREATE
-        if (values.purchase_type === 'parcelada' && values.installments_total && values.installments_total > 1) {
+        if (values.account_type === 'parcelada' && values.installments_total && values.installments_total > 1) {
           const groupId = uuidv4();
           const newAccounts = Array.from({ length: values.installments_total }).map((_, i) => {
             const dueDate = new Date(values.due_date);
@@ -166,12 +188,11 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               name: `${values.name} ${i + 1}/${values.installments_total}`,
               due_date: format(dueDate, "yyyy-MM-dd"),
               total_value: values.total_value,
-              purchase_type: 'parcelada',
+              account_type: 'parcelada',
               installments_total: values.installments_total,
               installment_current: i + 1,
               installment_value: values.total_value,
               status: 'pendente',
-              is_recurrent: values.is_recurrent,
               notes: values.notes,
               group_id: groupId,
               bill_proof_url,
@@ -190,6 +211,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               management_type: managementType,
               bill_proof_url,
               payment_proof_url,
+              recurrence_end_date,
             },
           ]);
           if (error) throw error;
@@ -215,7 +237,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-[80vh] overflow-y-auto p-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem>
@@ -230,7 +252,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                   <FormControl>
                     <CurrencyInput
                       placeholder="R$ 0,00"
-                      value={field.value}
+                      value={field.value || 0}
                       onValueChange={field.onChange}
                     />
                   </FormControl>
@@ -270,28 +292,21 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={form.control} name="purchase_type" render={({ field }) => (
+              <FormField control={form.control} name="account_type" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tipo de Compra</FormLabel>
+                  <FormLabel>Tipo de Conta</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!!account}>
                     <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                     <SelectContent>
                       <SelectItem value="unica">Única</SelectItem>
                       <SelectItem value="parcelada">Parcelada</SelectItem>
+                      <SelectItem value="recorrente">Recorrente</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={form.control} name="is_recurrent" render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm h-full">
-                  <div className="space-y-0.5">
-                    <FormLabel>Conta Recorrente?</FormLabel>
-                  </div>
-                  <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                </FormItem>
-              )} />
-              {purchaseType === 'parcelada' && !account && (
+              {accountType === 'parcelada' && !account && (
                 <FormField control={form.control} name="installments_total" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Total de Parcelas</FormLabel>
@@ -300,42 +315,102 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                   </FormItem>
                 )} />
               )}
-              <FormField control={form.control} name="payment_date" render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Data de Pagamento</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
+              {accountType === 'recorrente' && (
+                <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4 border p-4 rounded-md">
+                  <FormField control={form.control} name="recurrence_end_date" render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Data Final da Recorrência</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={form.watch('recurrence_indefinite')}>
+                              {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={field.value} onSelect={field.onChange} />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="recurrence_indefinite" render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-2 pt-6">
                       <FormControl>
-                        <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                          {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={field.value} onSelect={field.onChange} />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="payment_method" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Método de Pagamento</FormLabel>
-                  <FormControl><Input placeholder="Ex: Cartão de Crédito" {...field} value={field.value ?? ''} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+                      <FormLabel>Sem data de término</FormLabel>
+                    </FormItem>
+                  )} />
+                </div>
+              )}
+              {status === 'pago' && (
+                <>
+                  <FormField control={form.control} name="payment_date" render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Data de Pagamento</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                              {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={field.value} onSelect={field.onChange} />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="payment_method" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Modo de Pagamento</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                          <SelectItem value="pix">Pix</SelectItem>
+                          <SelectItem value="boleto">Boleto</SelectItem>
+                          <SelectItem value="transferencia">Transferência</SelectItem>
+                          <SelectItem value="cartao">Cartão de Crédito/Débito</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  {paymentMethod && paymentMethod !== 'dinheiro' && (
+                    <FormField control={form.control} name="payment_bank_id" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Banco de Pagamento</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Selecione o banco..." /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            {bankAccounts.map(bank => (
+                              <SelectItem key={bank.id} value={bank.id}>{bank.account_name} - {bank.bank_name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
+                  <FormField control={form.control} name="payment_proof" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Comprovante de Pagamento</FormLabel>
+                      <FormControl><Input type="file" onChange={(e) => field.onChange(e.target.files)} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </>
+              )}
               <FormField control={form.control} name="bill_proof" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Fatura / Conta</FormLabel>
-                  <FormControl><Input type="file" onChange={(e) => field.onChange(e.target.files)} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="payment_proof" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Comprovante de Pagamento</FormLabel>
                   <FormControl><Input type="file" onChange={(e) => field.onChange(e.target.files)} /></FormControl>
                   <FormMessage />
                 </FormItem>

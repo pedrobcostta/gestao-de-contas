@@ -6,19 +6,21 @@ export interface Account {
   due_date: string;
   payment_date: string | null;
   total_value: number;
-  purchase_type: "unica" | "parcelada";
+  account_type: "unica" | "parcelada" | "recorrente";
   installments_total: number | null;
   installment_current: number | null;
   installment_value: number | null;
   payment_proof_url: string | null;
   bill_proof_url: string | null;
   other_attachments: string[] | null;
-  payment_method: string | null;
+  payment_method: "dinheiro" | "pix" | "boleto" | "transferencia" | "cartao" | null;
+  payment_bank_id: string | null;
+  pix_br_code: string | null;
   notes: string | null;
   status: "pago" | "pendente" | "vencido";
   fees_and_fines: number | null;
   created_at: string;
-  is_recurrent: boolean;
+  recurrence_end_date: string | null;
   group_id: string | null;
 }
 

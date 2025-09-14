@@ -28,9 +28,10 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } 
   vencido: "destructive",
 };
 
-const purchaseTypeLabels: { [key: string]: string } = {
+const accountTypeLabels: { [key: string]: string } = {
   unica: "Única",
   parcelada: "Parcelada",
+  recorrente: "Recorrente",
 };
 
 export function AccountDetails({ isOpen, setIsOpen, account }: AccountDetailsProps) {
@@ -80,7 +81,7 @@ export function AccountDetails({ isOpen, setIsOpen, account }: AccountDetailsPro
               <CardContent className="pt-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="font-medium text-muted-foreground">Valor {account.purchase_type === 'parcelada' ? 'da Parcela' : 'Total'}</p>
+                    <p className="font-medium text-muted-foreground">Valor {account.account_type === 'parcelada' ? 'da Parcela' : 'Total'}</p>
                     <p className="font-semibold text-lg">{formatCurrency(account.total_value)}</p>
                   </div>
                   <div>
@@ -100,8 +101,8 @@ export function AccountDetails({ isOpen, setIsOpen, account }: AccountDetailsPro
                     </div>
                   )}
                   <div>
-                    <p className="font-medium text-muted-foreground">Tipo de Compra</p>
-                    <p>{purchaseTypeLabels[account.purchase_type]}</p>
+                    <p className="font-medium text-muted-foreground">Tipo de Conta</p>
+                    <p>{accountTypeLabels[account.account_type]}</p>
                   </div>
                   {account.payment_method && (
                      <div>

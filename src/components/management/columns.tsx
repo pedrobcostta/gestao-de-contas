@@ -34,7 +34,7 @@ export const columns = ({ onView, onEdit }: { onView: (account: Account) => void
     let error = null;
     let successMessage = "";
 
-    if (account.group_id && account.purchase_type === 'parcelada') {
+    if (account.group_id && account.account_type === 'parcelada') {
       if (confirm("Esta é uma conta parcelada. Deseja deletar TODAS as parcelas relacionadas a esta compra?")) {
         const { error: deleteError } = await supabase.from('accounts').delete().eq('group_id', account.group_id);
         error = deleteError;
