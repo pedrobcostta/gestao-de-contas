@@ -29,3 +29,18 @@ export interface PixKey {
   owner_name: string | null;
   created_at: string;
 }
+
+export interface BankAccount {
+  id: string;
+  user_id: string;
+  management_type: "pessoal" | "casa" | "pai" | "mae";
+  account_type: "conta_corrente" | "poupanca" | "cartao_credito";
+  bank_name: string;
+  account_name: string;
+  agency: string | null;
+  account_number: string | null;
+  card_limit: number | null;
+  card_closing_day: number | null;
+  card_due_day: number | null;
+  created_at: string;
+}
