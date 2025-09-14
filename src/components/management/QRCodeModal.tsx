@@ -4,7 +4,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import QRCode from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 
 interface QRCodeModalProps {
   isOpen: boolean;
@@ -20,7 +20,7 @@ export function QRCodeModal({ isOpen, setIsOpen, value }: QRCodeModalProps) {
           <DialogTitle>QR Code PIX</DialogTitle>
         </DialogHeader>
         <div className="flex justify-center p-4 bg-white rounded-md">
-          {value && <QRCode value={value} size={256} />}
+          {value && <QRCodeCanvas value={value} size={256} />}
         </div>
       </DialogContent>
     </Dialog>
