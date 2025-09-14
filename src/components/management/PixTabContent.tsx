@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   flexRender,
@@ -14,9 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { PixKey } from "@/types";
-import { PixForm } from "./PixForm";
 import { pixColumns } from "./pixColumns";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -25,9 +22,6 @@ interface PixTabContentProps {
 }
 
 export function PixTabContent({ managementType }: PixTabContentProps) {
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedPixKey, setSelectedPixKey] = useState<PixKey | null>(null);
-
   const { data: pixKeys = [], isLoading } = useQuery({
     queryKey: ['pix_keys', managementType],
     queryFn: async (): Promise<PixKey[]> => {
@@ -43,23 +37,12 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
 
   const table = useReactTable({
     data: pixKeys,
-    columns: pixColumns({ onEdit: (pixKey) => {
-      setSelectedPixKey(pixKey);
-      setIsFormOpen(true);
-    }}),
+    columns: pixColumns(),
     getCoreRowModel: getCoreRowModel(),
   });
 
-  const handleAddPixKey = () => {
-    setSelectedPixKey(null);
-    setIsFormOpen(true);
-  };
-
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <Button onClick={handleAddPixKey}>Adicionar Chave PIX</Button>
-      </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -110,12 +93,6 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
           </TableBody>
         </Table>
       </div>
-      <PixForm
-        isOpen={isFormOpen}
-        setIsOpen={setIsFormOpen}
-        pixKey={selectedPixKey}
-        managementType={managementType}
-      />
     </div>
   );
 }

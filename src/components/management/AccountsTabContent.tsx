@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  ColumnDef,
   flexRender,
   getCoreRowModel,
   useReactTable,
@@ -14,9 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Account } from "@/types";
-import { AccountForm } from "./AccountForm";
 import { columns } from "./columns";
 import { AccountDetails } from "./AccountDetails";
 
@@ -26,9 +23,7 @@ interface AccountsTabContentProps {
   managementType: Account["management_type"];
 }
 
-export function AccountsTabContent({ data, isLoading, managementType }: AccountsTabContentProps) {
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+export function AccountsTabContent({ data, isLoading }: AccountsTabContentProps) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [accountForDetails, setAccountForDetails] = useState<Account | null>(null);
 
@@ -40,25 +35,13 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
   const table = useReactTable({
     data,
     columns: columns({
-      onEdit: (account) => {
-        setSelectedAccount(account);
-        setIsFormOpen(true);
-      },
       onView: handleViewAccount,
     }),
     getCoreRowModel: getCoreRowModel(),
   });
 
-  const handleAddAccount = () => {
-    setSelectedAccount(null);
-    setIsFormOpen(true);
-  };
-
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <Button onClick={handleAddAccount}>Adicionar Conta</Button>
-      </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -109,12 +92,6 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
           </TableBody>
         </Table>
       </div>
-      <AccountForm
-        isOpen={isFormOpen}
-        setIsOpen={setIsFormOpen}
-        account={selectedAccount}
-        managementType={managementType}
-      />
       <AccountDetails
         isOpen={isDetailsOpen}
         setIsOpen={setIsDetailsOpen}

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   flexRender,
@@ -14,9 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { BankAccount } from "@/types";
-import { BankAccountForm } from "./BankAccountForm";
 import { bankAccountsColumns } from "./bankAccountsColumns";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -25,9 +22,6 @@ interface BankAccountsTabContentProps {
 }
 
 export function BankAccountsTabContent({ managementType }: BankAccountsTabContentProps) {
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
-
   const { data: bankAccounts = [], isLoading } = useQuery({
     queryKey: ['bank_accounts', managementType],
     queryFn: async (): Promise<BankAccount[]> => {
@@ -43,23 +37,12 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
 
   const table = useReactTable({
     data: bankAccounts,
-    columns: bankAccountsColumns({ onEdit: (account) => {
-      setSelectedAccount(account);
-      setIsFormOpen(true);
-    }}),
+    columns: bankAccountsColumns(),
     getCoreRowModel: getCoreRowModel(),
   });
 
-  const handleAddAccount = () => {
-    setSelectedAccount(null);
-    setIsFormOpen(true);
-  };
-
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <Button onClick={handleAddAccount}>Adicionar Conta</Button>
-      </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -100,12 +83,6 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
           </TableBody>
         </Table>
       </div>
-      <BankAccountForm
-        isOpen={isFormOpen}
-        setIsOpen={setIsFormOpen}
-        bankAccount={selectedAccount}
-        managementType={managementType}
-      />
     </div>
   );
 }

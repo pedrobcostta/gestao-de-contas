@@ -25,7 +25,7 @@ const keyTypeLabels: { [key: string]: string } = {
   aleatoria: "Aleatória",
 };
 
-export const pixColumns = ({ onEdit }: { onEdit: (pixKey: PixKey) => void }): ColumnDef<PixKey>[] => {
+export const pixColumns = (): ColumnDef<PixKey>[] => {
   const queryClient = useQueryClient();
 
   const handleDelete = async (pixKeyId: string) => {
@@ -86,9 +86,6 @@ export const pixColumns = ({ onEdit }: { onEdit: (pixKey: PixKey) => void }): Co
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => onEdit(pixKey)}>
-                Editar
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleCopy(pixKey.key_value)}>
                 Copiar Chave
               </DropdownMenuItem>

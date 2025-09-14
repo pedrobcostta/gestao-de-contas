@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   flexRender,
@@ -14,15 +13,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { User } from "@/types";
-import { UserForm } from "./UserForm";
 import { usersColumns } from "./usersColumns";
 import { supabase } from "@/integrations/supabase/client";
 
 export function UsersTabContent() {
-  const [isFormOpen, setIsFormOpen] = useState(false);
-
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: async (): Promise<User[]> => {
@@ -40,9 +35,6 @@ export function UsersTabContent() {
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <Button onClick={() => setIsFormOpen(true)}>Adicionar Usuário</Button>
-      </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -83,10 +75,6 @@ export function UsersTabContent() {
           </TableBody>
         </Table>
       </div>
-      <UserForm
-        isOpen={isFormOpen}
-        setIsOpen={setIsFormOpen}
-      />
     </div>
   );
 }

@@ -27,7 +27,7 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } 
   vencido: "destructive",
 };
 
-export const columns = ({ onEdit, onView }: { onEdit: (account: Account) => void; onView: (account: Account) => void; }): ColumnDef<Account>[] => {
+export const columns = ({ onView }: { onView: (account: Account) => void; }): ColumnDef<Account>[] => {
   const queryClient = useQueryClient();
 
   const handleDelete = async (account: Account) => {
@@ -101,9 +101,6 @@ export const columns = ({ onEdit, onView }: { onEdit: (account: Account) => void
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => onView(account)}>
                 Visualizar
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit(account)}>
-                Editar
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleDelete(account)} className="text-red-600">
