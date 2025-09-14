@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Account, BankAccount } from "@/types";
 import { showError, showSuccess } from "@/utils/toast";
+import { Label } from "../ui/label";
 
 const accountSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório."),
@@ -80,7 +81,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
       purchase_type: "unica",
       is_recurrent: false,
       notes: "",
-      payment_method: "",
+      payment_method: undefined,
       installments_total: 2,
       recurrence_frequency: "monthly",
     },
@@ -118,7 +119,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
           purchase_type: account.purchase_type,
           is_recurrent: account.is_recurrent,
           notes: account.notes || "",
-          payment_method: account.payment_method || "",
+          payment_method: account.payment_method || undefined,
         });
         setExistingOtherAttachments(account.other_attachments || []);
       } else {
@@ -130,7 +131,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
           purchase_type: "unica",
           is_recurrent: false,
           notes: "",
-          payment_method: "",
+          payment_method: undefined,
           installments_total: 2,
           recurrence_frequency: "monthly",
         });
@@ -157,7 +158,6 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
 
     try {
       if (values.purchase_type === 'parcelada' && !account) {
-        // --- Lógica para criar contas parceladas ---
         const groupId = crypto.randomUUID();
         const installmentsToCreate = [];
         const installmentValue = values.total_value / values.installments_total!;
@@ -169,7 +169,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
             case 'weekly': dueDate = addWeeks(startDate, i); break;
             case 'bimonthly': dueDate = addMonths(startDate, i * 2); break;
             case 'quarterly': dueDate = addQuarters(startDate, i); break;
-            default: dueDate = addMonths(startDate, i); // Mensal
+            default: dueDate = addMonths(startDate, i);
           }
 
           installmentsToCreate.push({
@@ -195,7 +195,6 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         showSuccess(`${values.installments_total} parcelas criadas com sucesso!`);
 
       } else {
-        // --- Lógica para conta única ou edição ---
         const uploadFile = async (file: File, userId: string): Promise<string> => {
           const filePath = `${userId}/${Date.now()}-${file.name}`;
           const { error } = await supabase.storage.from('attachments').upload(filePath, file);
@@ -276,9 +275,28 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
             
             <div className="space-y-4 pt-4 border-t">
               <h3 className="text-lg font-medium">Anexos</h3>
-              <FormItem> <FormLabel>Fatura / Conta</FormLabel> {account?.bill_proof_url && !billProofFile && ( <div className="text-sm text-blue-500 underline"> <a href={account.bill_proof_url} target="_blank" rel="noopener noreferrer">Ver fatura atual</a> </div> )} <FormControl> <Input type="file" accept="image/*,application/pdf" onChange={(e) => setBillProofFile(e.target.files?.[0] || null)} /> </FormControl> </FormItem>
-              {status === 'pago' && ( <FormItem> <FormLabel>Comprovante de Pagamento</FormLabel> {account?.payment_proof_url && !paymentProofFile && ( <div className="text-sm text-blue-500 underline"> <a href={account.payment_proof_url} target="_blank" rel="noopener noreferrer">Ver comprovante atual</a> </div> )} <FormControl> <Input type="file" accept="image/*,application/pdf" onChange={(e) => setPaymentProofFile(e.target.files?.[0] || null)} /> </FormControl> </FormItem> )}
-              <div className="space-y-2"> <FormLabel>Outros Anexos</FormLabel> <div className="space-y-2"> {existingOtherAttachments.map((url, index) => ( <div key={index} className="flex items-center justify-between text-sm p-2 border rounded-md"> <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline truncate pr-2">Anexo salvo {index + 1}</a> <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveExistingAttachment(index)}> <Trash2 className="h-4 w-4 text-red-500" /> </Button> </div> ))} {otherAttachmentsFiles.map((file, index) => ( <div key={index} className="flex items-center justify-between text-sm p-2 border rounded-md"> <span className="truncate pr-2">{file.name}</span> <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setOtherAttachmentsFiles(prev => prev.filter((_, i) => i !== index))}> <Trash2 className="h-4 w-4 text-red-500" /> </Button> </div> ))} </div> <FormControl> <Input type="file" multiple accept="image/*,application/pdf" className="mt-2" onChange={(e) => { if (e.target.files) { setOtherAttachmentsFiles(prev => [...prev, ...Array.from(e.target.files!)]); } }} /> </FormControl> </div>
+              <div className="space-y-2">
+                <Label>Fatura / Conta</Label>
+                {account?.bill_proof_url && !billProofFile && ( <div className="text-sm text-blue-500 underline"> <a href={account.bill_proof_url} target="_blank" rel="noopener noreferrer">Ver fatura atual</a> </div> )}
+                <Input type="file" accept="image/*,application/pdf" onChange={(e) => setBillProofFile(e.target.files?.[0] || null)} />
+              </div>
+
+              {status === 'pago' && (
+                <div className="space-y-2">
+                  <Label>Comprovante de Pagamento</Label>
+                  {account?.payment_proof_url && !paymentProofFile && ( <div className="text-sm text-blue-500 underline"> <a href={account.payment_proof_url} target="_blank" rel="noopener noreferrer">Ver comprovante atual</a> </div> )}
+                  <Input type="file" accept="image/*,application/pdf" onChange={(e) => setPaymentProofFile(e.target.files?.[0] || null)} />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Outros Anexos</Label>
+                <div className="space-y-2">
+                  {existingOtherAttachments.map((url, index) => ( <div key={index} className="flex items-center justify-between text-sm p-2 border rounded-md"> <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline truncate pr-2">Anexo salvo {index + 1}</a> <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveExistingAttachment(index)}> <Trash2 className="h-4 w-4 text-red-500" /> </Button> </div> ))}
+                  {otherAttachmentsFiles.map((file, index) => ( <div key={index} className="flex items-center justify-between text-sm p-2 border rounded-md"> <span className="truncate pr-2">{file.name}</span> <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setOtherAttachmentsFiles(prev => prev.filter((_, i) => i !== index))}> <Trash2 className="h-4 w-4 text-red-500" /> </Button> </div> ))}
+                </div>
+                <Input type="file" multiple accept="image/*,application/pdf" className="mt-2" onChange={(e) => { if (e.target.files) { setOtherAttachmentsFiles(prev => [...prev, ...Array.from(e.target.files!)]); } }} />
+              </div>
             </div>
 
             <Button type="submit" disabled={isUploading} className="w-full">
