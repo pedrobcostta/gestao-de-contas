@@ -74,7 +74,7 @@ const Login = () => {
           appearance={{ theme: ThemeSupa }}
           view="sign_in"
           theme="light"
-          showLinks={true}
+          showLinks={false}
           providers={[]}
           localization={{ variables: pt }}
         />
