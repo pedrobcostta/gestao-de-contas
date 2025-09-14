@@ -1,6 +1,6 @@
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { pt } from '@supabase/auth-ui-shared/dist/esm/locales';
+import { pt } from '@supabase/auth-ui-shared/dist/esm/locales.js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
