@@ -9,6 +9,7 @@ import { AccountsTabContent } from "./AccountsTabContent";
 import { PixTabContent } from "./PixTabContent";
 import { BankAccountsTabContent } from "./BankAccountsTabContent";
 import { PaidAccountsTabContent } from "./PaidAccountsTabContent";
+import { ReportsTabContent } from "./ReportsTabContent";
 
 interface ManagementLayoutProps {
   title: string;
@@ -85,7 +86,7 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
           <TabsTrigger value="pix">Gestão de PIX</TabsTrigger>
           <TabsTrigger value="bancos">Gestão de Bancos</TabsTrigger>
           <TabsTrigger value="pagas">Contas Pagas</TabsTrigger>
-          <TabsTrigger value="relatorios" disabled>Relatórios</TabsTrigger>
+          <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
           <TabsTrigger value="config" disabled>Configuração</TabsTrigger>
         </TabsList>
         <TabsContent value="contas">
@@ -127,6 +128,9 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
               <PaidAccountsTabContent managementType={managementType} />
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="relatorios">
+          <ReportsTabContent managementType={managementType} />
         </TabsContent>
       </Tabs>
     </div>
