@@ -56,6 +56,7 @@ const formSchema = z.object({
   payment_date: z.date().optional().nullable(),
   payment_method: z.enum(["dinheiro", "pix", "boleto", "transferencia", "cartao"]).optional().nullable(),
   payment_bank_id: z.string().optional().nullable(),
+  pix_br_code: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   bill_proof: z.instanceof(FileList).optional(),
   payment_proof: z.instanceof(FileList).optional(),
@@ -123,7 +124,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         ...account,
         due_date: new Date(`${account.due_date}T00:00:00`),
         payment_date: account.payment_date ? new Date(`${account.payment_date}T00:00:00`) : null,
-        total_value: account.account_type === 'parcelada' ? account.installment_value : account.total_value,
+        total_value: account.account_type === 'parcelada' && account.installment_value ? account.installment_value : account.total_value,
         recurrence_end_date: account.recurrence_end_date ? new Date(`${account.recurrence_end_date}T00:00:00`) : null,
         recurrence_indefinite: !account.recurrence_end_date,
       });
@@ -196,6 +197,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               notes: values.notes,
               group_id: groupId,
               bill_proof_url,
+              pix_br_code: values.pix_br_code,
             };
           });
           const { error } = await supabase.from('accounts').insert(newAccounts);
@@ -248,7 +250,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               )} />
               <FormField control={form.control} name="total_value" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Valor</FormLabel>
+                  <FormLabel>Valor {accountType === 'parcelada' ? 'da Parcela' : ''}</FormLabel>
                   <FormControl>
                     <CurrencyInput
                       placeholder="R$ 0,00"
@@ -261,7 +263,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               )} />
               <FormField control={form.control} name="due_date" render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Data de Vencimento</FormLabel>
+                  <FormLabel>Data de Vencimento {accountType === 'parcelada' ? 'da 1ª Parcela' : ''}</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -398,6 +400,25 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                         <FormMessage />
                       </FormItem>
                     )} />
+                  )}
+                  {paymentMethod === 'pix' && (
+                    <FormField
+                      control={form.control}
+                      name="pix_br_code"
+                      render={({ field }) => (
+                        <FormItem className="col-span-1 md:col-span-2">
+                          <FormLabel>PIX Copia e Cola (BR Code)</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Cole o código PIX aqui..."
+                              {...field}
+                              value={field.value ?? ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   )}
                   <FormField control={form.control} name="payment_proof" render={({ field }) => (
                     <FormItem>

@@ -38,11 +38,6 @@ export const pixColumns = ({ onEdit }: { onEdit: (pixKey: PixKey) => void; }): C
     }
   };
 
-  const handleCopy = (value: string) => {
-    navigator.clipboard.writeText(value);
-    showSuccess("Chave PIX copiada para a área de transferência!");
-  };
-
   return [
     {
       accessorKey: "key_type",
@@ -54,14 +49,6 @@ export const pixColumns = ({ onEdit }: { onEdit: (pixKey: PixKey) => void; }): C
     {
       accessorKey: "key_value",
       header: "Chave PIX",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <span>{row.original.key_value}</span>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopy(row.original.key_value)}>
-            <Copy className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
     },
     {
       accessorKey: "owner_name",
@@ -75,6 +62,17 @@ export const pixColumns = ({ onEdit }: { onEdit: (pixKey: PixKey) => void; }): C
       id: "actions",
       cell: ({ row }) => {
         const pixKey = row.original
+
+        const handleCopy = (type: 'key' | 'full') => {
+          let textToCopy = '';
+          if (type === 'key') {
+            textToCopy = pixKey.key_value;
+          } else {
+            textToCopy = `Chave PIX: ${pixKey.key_value}\nBanco: ${pixKey.bank_name}\nTitular: ${pixKey.owner_name}`;
+          }
+          navigator.clipboard.writeText(textToCopy);
+          showSuccess("Dados copiados para a área de transferência!");
+        };
   
         return (
           <DropdownMenu>
@@ -86,8 +84,11 @@ export const pixColumns = ({ onEdit }: { onEdit: (pixKey: PixKey) => void; }): C
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => handleCopy(pixKey.key_value)}>
+              <DropdownMenuItem onClick={() => handleCopy('key')}>
                 Copiar Chave
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleCopy('full')}>
+                Copiar Dados Completos
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onEdit(pixKey)}>
                 Editar

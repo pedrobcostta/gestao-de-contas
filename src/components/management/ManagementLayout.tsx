@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -52,6 +52,46 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
     }
   });
 
+  const processedData = useMemo(() => {
+    const installmentsByGroup = new Map<string, Account[]>();
+    const otherAccounts: Account[] = [];
+
+    for (const account of accounts) {
+      if (account.account_type === 'parcelada' && account.group_id) {
+        if (!installmentsByGroup.has(account.group_id)) {
+          installmentsByGroup.set(account.group_id, []);
+        }
+        installmentsByGroup.get(account.group_id)!.push(account);
+      } else {
+        otherAccounts.push(account);
+      }
+    }
+
+    const groupedAccounts: (Account & { subRows?: Account[], isGroup?: boolean })[] = [];
+    for (const [groupId, installments] of installmentsByGroup.entries()) {
+      installments.sort((a, b) => (a.installment_current || 0) - (b.installment_current || 0));
+      const firstInstallment = installments[0];
+      const parentName = firstInstallment.name.replace(/ \d+\/\d+$/, '').trim();
+      const totalValue = installments.reduce((sum, inst) => sum + inst.total_value, 0);
+      const paidCount = installments.filter(i => i.status === 'pago').length;
+
+      const parentRow: any = {
+        id: groupId,
+        name: parentName,
+        due_date: firstInstallment.due_date,
+        total_value: totalValue,
+        status: `${paidCount}/${installments.length} pagas`,
+        account_type: 'parcelada',
+        subRows: installments,
+        management_type: firstInstallment.management_type,
+        isGroup: true,
+      };
+      groupedAccounts.push(parentRow);
+    }
+
+    return [...otherAccounts, ...groupedAccounts].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+  }, [accounts]);
+
   const summary = accounts.reduce((acc, account) => {
     if (account.status === 'pago') {
       acc.paid += account.total_value;
@@ -87,7 +127,6 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
         </div>
       </div>
 
-      {/* Resumo Consolidado */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -121,7 +160,6 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
         </Card>
       </div>
 
-      {/* Submenu e Conteúdo */}
       <Tabs defaultValue="contas" className="space-y-4">
         <TabsList className="overflow-x-auto w-full justify-start">
           <TabsTrigger value="contas">Gestão de Contas</TabsTrigger>
@@ -138,7 +176,7 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
               <CardTitle>Contas do Mês</CardTitle>
             </CardHeader>
             <CardContent>
-              <AccountsTabContent data={accounts} isLoading={isLoading} managementType={managementType} />
+              <AccountsTabContent data={processedData} isLoading={isLoading} managementType={managementType} />
             </CardContent>
           </Card>
         </TabsContent>

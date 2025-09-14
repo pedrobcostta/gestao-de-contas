@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,13 +9,15 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Account } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { FileText, Link as LinkIcon, List } from "lucide-react";
+import { FileText, Link as LinkIcon, List, QrCode } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { QRCodeModal } from "./QRCodeModal";
 
 interface AccountDetailsProps {
   isOpen: boolean;
@@ -35,6 +38,8 @@ const accountTypeLabels: { [key: string]: string } = {
 };
 
 export function AccountDetails({ isOpen, setIsOpen, account }: AccountDetailsProps) {
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+
   const { data: installments = [], isLoading } = useQuery({
     queryKey: ['installments', account?.group_id],
     queryFn: async (): Promise<Account[]> => {
@@ -78,6 +83,17 @@ export function AccountDetails({ isOpen, setIsOpen, account }: AccountDetailsPro
           </TabsList>
           <TabsContent value="details">
             <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>Detalhes da Conta</CardTitle>
+                  {account.pix_br_code && (
+                    <Button variant="outline" size="sm" onClick={() => setIsQrModalOpen(true)}>
+                      <QrCode className="h-4 w-4 mr-2" />
+                      Gerar QR Code
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
               <CardContent className="pt-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
@@ -177,6 +193,13 @@ export function AccountDetails({ isOpen, setIsOpen, account }: AccountDetailsPro
             </TabsContent>
           )}
         </Tabs>
+        {account.pix_br_code && (
+          <QRCodeModal
+            isOpen={isQrModalOpen}
+            setIsOpen={setIsQrModalOpen}
+            value={account.pix_br_code}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

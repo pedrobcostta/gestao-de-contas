@@ -1,7 +1,7 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal } from "lucide-react"
+import { MoreHorizontal, Repeat, ChevronDown, ChevronRight } from "lucide-react"
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -27,7 +27,7 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } 
   vencido: "destructive",
 };
 
-export const columns = ({ onView, onEdit }: { onView: (account: Account) => void; onEdit: (account: Account) => void; }): ColumnDef<Account>[] => {
+export const columns = ({ onView, onEdit }: { onView: (account: Account) => void; onEdit: (account: Account) => void; }): ColumnDef<Account & { isGroup?: boolean, subRows?: Account[] }>[] => {
   const queryClient = useQueryClient();
 
   const handleDelete = async (account: Account) => {
@@ -62,8 +62,30 @@ export const columns = ({ onView, onEdit }: { onView: (account: Account) => void
 
   return [
     {
+      id: 'expander',
+      header: () => null,
+      cell: ({ row }) => {
+        return row.getCanExpand() ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={row.getToggleExpandedHandler()}
+            className="w-8 h-8 p-0"
+          >
+            {row.getIsExpanded() ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </Button>
+        ) : <div className="w-8"></div>;
+      },
+    },
+    {
       accessorKey: "name",
       header: "Nome",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          {row.original.account_type === 'recorrente' && <Repeat className="h-4 w-4 text-muted-foreground" title="Conta Recorrente" />}
+          <span>{row.original.name}</span>
+        </div>
+      ),
     },
     {
       accessorKey: "due_date",
@@ -78,16 +100,23 @@ export const columns = ({ onView, onEdit }: { onView: (account: Account) => void
     {
       accessorKey: "status",
       header: "Status",
-      cell: ({ row }) => (
-        <Badge variant={statusVariant[row.original.status] || "secondary"}>
-          {row.original.status}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const { status, isGroup } = row.original;
+        if (isGroup) {
+          return <Badge variant="outline">{status}</Badge>;
+        }
+        return (
+          <Badge variant={statusVariant[status] || "secondary"}>
+            {status}
+          </Badge>
+        );
+      },
     },
     {
       id: "actions",
       cell: ({ row }) => {
         const account = row.original
+        if (account.isGroup) return null;
   
         return (
           <DropdownMenu>

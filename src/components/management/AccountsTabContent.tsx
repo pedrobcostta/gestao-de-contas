@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
+  getExpandedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 
@@ -20,7 +21,7 @@ import { AccountDetails } from "./AccountDetails";
 import { AccountForm } from "./AccountForm";
 
 interface AccountsTabContentProps {
-  data: Account[];
+  data: (Account & { subRows?: Account[] })[];
   isLoading: boolean;
   managementType: Account["management_type"];
 }
@@ -53,6 +54,8 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
       onEdit: handleEditAccount,
     }),
     getCoreRowModel: getCoreRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    getRowCanExpand: row => !!row.original.subRows,
   });
 
   return (
