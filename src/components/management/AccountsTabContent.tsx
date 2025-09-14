@@ -64,7 +64,7 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
         <Button onClick={handleAddAccount}>Adicionar Conta</Button>
       </div>
       <div className="rounded-md border overflow-x-auto">
-        <Table>
+        <Table className="min-w-[800px]">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>

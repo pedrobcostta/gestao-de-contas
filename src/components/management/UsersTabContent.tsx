@@ -44,7 +44,7 @@ export function UsersTabContent() {
         <Button onClick={() => setIsFormOpen(true)}>Adicionar Usuário</Button>
       </div>
       <div className="rounded-md border overflow-x-auto">
-        <Table>
+        <Table className="min-w-[700px]">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>

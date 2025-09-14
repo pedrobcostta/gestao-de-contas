@@ -63,7 +63,7 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
         <Button onClick={handleAdd}>Adicionar Conta/Cartão</Button>
       </div>
       <div className="rounded-md border overflow-x-auto">
-        <Table>
+        <Table className="min-w-[600px]">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
