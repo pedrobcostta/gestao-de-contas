@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import<think>**Resolving Destructuring Issue**
-
-I've resolved the TypeScript error in `AccountForm.tsx`. I realized I was incorrectly trying to remove an `id` from `accountData`, which represents update data and doesn't include an `id`. The `id` is part of the original account. I've removed the incorrect destructuring, directly using `accountData` as a base, which avoids the error.
-
-
-</think> { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, addMonths, addWeeks, addQuarters } from "date-fns";
