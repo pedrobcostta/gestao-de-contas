@@ -76,7 +76,7 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(summary.overdue)}</div>
             <p className="text-xs text-muted-foreground">Total de contas vencidas</p>
-          </C</CardContent>
+          </CardContent>
         </Card>
       </div>
 

@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
 import {
