@@ -1,4 +1,3 @@
-import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -7,17 +6,15 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Account } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { FileText, Link as LinkIcon, List, QrCode } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { QRCodeModal } from "./QRCodeModal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Download, Loader2 } from "lucide-react";
 
 interface AccountDetailsProps {
   isOpen: boolean;
@@ -31,16 +28,15 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } 
   vencido: "destructive",
 };
 
-const accountTypeLabels: { [key: string]: string } = {
-  unica: "Única",
-  parcelada: "Parcelada",
-  recorrente: "Recorrente",
-};
+const DetailItem = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  <div className="flex flex-col">
+    <span className="text-sm text-muted-foreground">{label}</span>
+    <span className="font-medium">{value || "-"}</span>
+  </div>
+);
 
 export function AccountDetails({ isOpen, setIsOpen, account }: AccountDetailsProps) {
-  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
-
-  const { data: installments = [], isLoading } = useQuery({
+  const { data: installments = [], isLoading: isLoadingInstallments } = useQuery({
     queryKey: ['installments', account?.group_id],
     queryFn: async (): Promise<Account[]> => {
       if (!account?.group_id) return [];
@@ -55,189 +51,98 @@ export function AccountDetails({ isOpen, setIsOpen, account }: AccountDetailsPro
     enabled: !!account?.group_id,
   });
 
-  const summary = useMemo(() => {
-    if (!installments || installments.length === 0) return null;
-
-    const paidInstallments = installments.filter(i => i.status === 'pago');
-    const unpaidInstallments = installments.filter(i => i.status !== 'pago');
-
-    const paidCount = paidInstallments.length;
-    const totalPaid = paidInstallments.reduce((sum, i) => sum + (i.total_value || 0), 0);
-
-    const remainingCount = unpaidInstallments.length;
-    const totalRemaining = unpaidInstallments.reduce((sum, i) => sum + (i.total_value || 0), 0);
-
-    return { paidCount, totalPaid, remainingCount, totalRemaining };
-  }, [installments]);
-
   if (!account) return null;
-
-  const allAttachments = [
-    ...(account.bill_proof_url ? [{ name: "Fatura / Conta", url: account.bill_proof_url }] : []),
-    ...(account.payment_proof_url ? [{ name: "Comprovante de Pagamento", url: account.payment_proof_url }] : []),
-    ...(account.other_attachments?.map((url, index) => ({ name: `Outro Anexo ${index + 1}`, url })) || []),
-  ];
-
-  const TABS = ["details", "attachments"];
-  if (account.group_id) TABS.push("installments");
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{account.name}</DialogTitle>
-          <DialogDescription>
-            Detalhes completos da conta.
-          </DialogDescription>
+          <DialogTitle>Detalhes da Conta</DialogTitle>
+          <DialogDescription>{account.name}</DialogDescription>
         </DialogHeader>
+        
         <Tabs defaultValue="details" className="w-full">
-          <TabsList className={`grid w-full grid-cols-${TABS.length}`}>
+          <TabsList className={`grid w-full ${account.group_id ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <TabsTrigger value="details">Detalhes</TabsTrigger>
             <TabsTrigger value="attachments">Anexos</TabsTrigger>
             {account.group_id && <TabsTrigger value="installments">Parcelas</TabsTrigger>}
           </TabsList>
-          <TabsContent value="details">
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>Detalhes da Conta</CardTitle>
-                  {account.pix_br_code && (
-                    <Button variant="outline" size="sm" onClick={() => setIsQrModalOpen(true)}>
-                      <QrCode className="h-4 w-4 mr-2" />
-                      Gerar QR Code
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="font-medium text-muted-foreground">Valor {account.account_type === 'parcelada' ? 'da Parcela' : 'Total'}</p>
-                    <p className="font-semibold text-lg">{formatCurrency(account.total_value)}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-muted-foreground">Status</p>
-                    <Badge variant={statusVariant[account.status] || "secondary"}>
-                      {account.status}
-                    </Badge>
-                  </div>
-                  <div>
-                    <p className="font-medium text-muted-foreground">Data de Vencimento</p>
-                    <p>{format(new Date(`${account.due_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })}</p>
-                  </div>
-                  {account.payment_date && (
-                    <div>
-                      <p className="font-medium text-muted-foreground">Data de Pagamento</p>
-                      <p>{format(new Date(`${account.payment_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })}</p>
-                    </div>
-                  )}
-                  <div>
-                    <p className="font-medium text-muted-foreground">Tipo de Conta</p>
-                    <p>{accountTypeLabels[account.account_type]}</p>
-                  </div>
-                  {account.payment_method && (
-                     <div>
-                      <p className="font-medium text-muted-foreground">Método de Pagamento</p>
-                      <p>{account.payment_method}</p>
-                    </div>
-                  )}
-                </div>
-                {account.notes && (
-                  <div className="text-sm">
-                    <p className="font-medium text-muted-foreground">Observações</p>
-                    <p className="p-2 bg-muted rounded-md whitespace-pre-wrap">{account.notes}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            {summary && (
-              <Card className="mt-4">
-                  <CardHeader><CardTitle>Resumo das Parcelas</CardTitle></CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-4 text-sm pt-4">
-                      <div>
-                          <p className="font-medium text-muted-foreground">Parcelas Pagas</p>
-                          <p>{summary.paidCount} de {installments.length}</p>
-                      </div>
-                      <div>
-                          <p className="font-medium text-muted-foreground">Valor Total Pago</p>
-                          <p>{formatCurrency(summary.totalPaid)}</p>
-                      </div>
-                      <div>
-                          <p className="font-medium text-muted-foreground">Parcelas a Pagar</p>
-                          <p>{summary.remainingCount} de {installments.length}</p>
-                      </div>
-                      <div>
-                          <p className="font-medium text-muted-foreground">Valor Restante</p>
-                          <p>{formatCurrency(summary.totalRemaining)}</p>
-                      </div>
-                  </CardContent>
-              </Card>
+          
+          <TabsContent value="details" className="mt-4 space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <DetailItem label="Valor" value={formatCurrency(account.total_value)} />
+              <DetailItem label="Vencimento" value={format(new Date(`${account.due_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })} />
+              <DetailItem label="Status" value={<Badge variant={statusVariant[account.status] || "secondary"}>{account.status}</Badge>} />
+              <DetailItem label="Tipo" value={account.account_type} />
+              {account.payment_date && <DetailItem label="Data Pagamento" value={format(new Date(`${account.payment_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })} />}
+              {account.payment_method && <DetailItem label="Método Pagamento" value={account.payment_method} />}
+              {account.fees_and_fines && <DetailItem label="Juros e Multas" value={formatCurrency(account.fees_and_fines)} />}
+            </div>
+            {account.notes && (
+              <div>
+                <h4 className="font-medium mb-1">Observações</h4>
+                <p className="text-sm text-muted-foreground bg-slate-50 p-3 rounded-md">{account.notes}</p>
+              </div>
             )}
           </TabsContent>
-          <TabsContent value="attachments">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  <span>Documentos Anexados</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {allAttachments.length > 0 ? (
-                  <ul className="space-y-2">
-                    {allAttachments.map((attachment, index) => (
-                      <li key={index} className="flex items-center justify-between p-2 border rounded-md">
-                        <span className="text-sm font-medium">{attachment.name}</span>
-                        <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline" > Visualizar <LinkIcon className="h-3 w-3" /> </a>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    Nenhum anexo encontrado para esta conta.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+
+          <TabsContent value="attachments" className="mt-4">
+            <div className="space-y-4">
+              <h4 className="font-medium">Anexos</h4>
+              {!account.bill_proof_url && !account.payment_proof_url && (
+                <p className="text-sm text-muted-foreground">Nenhum anexo encontrado.</p>
+              )}
+              {account.bill_proof_url && (
+                <div className="flex items-center justify-between p-2 border rounded-md">
+                  <span className="text-sm">Fatura / Conta</span>
+                  <Button asChild variant="outline" size="sm">
+                    <a href={account.bill_proof_url} target="_blank" rel="noopener noreferrer">
+                      <Download className="mr-2 h-4 w-4" />
+                      Baixar
+                    </a>
+                  </Button>
+                </div>
+              )}
+              {account.payment_proof_url && (
+                <div className="flex items-center justify-between p-2 border rounded-md">
+                  <span className="text-sm">Comprovante de Pagamento</span>
+                  <Button asChild variant="outline" size="sm">
+                    <a href={account.payment_proof_url} target="_blank" rel="noopener noreferrer">
+                      <Download className="mr-2 h-4 w-4" />
+                      Baixar
+                    </a>
+                  </Button>
+                </div>
+              )}
+            </div>
           </TabsContent>
+
           {account.group_id && (
-            <TabsContent value="installments">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <List className="h-5 w-5" />
-                    <span>Histórico de Parcelas</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? <p>Carregando parcelas...</p> : (
-                    <ul className="space-y-2">
-                      {installments.map(inst => (
-                        <li key={inst.id} className={`flex items-center justify-between p-2 border rounded-md ${inst.id === account.id ? 'bg-muted' : ''}`}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{inst.name}</span>
-                            <span className="text-xs text-muted-foreground">Vencimento: {format(new Date(`${inst.due_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })}</span>
-                          </div>
-                          <div className="text-right">
-                            <Badge variant={statusVariant[inst.status] || "secondary"}>{inst.status}</Badge>
-                            <p className="font-semibold">{formatCurrency(inst.total_value)}</p>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
+            <TabsContent value="installments" className="mt-4">
+              <h4 className="font-medium mb-2">Parcelas</h4>
+              {isLoadingInstallments ? (
+                <div className="flex items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {installments.map(inst => (
+                    <div key={inst.id} className={`flex justify-between items-center p-2 rounded-md border ${inst.id === account.id ? 'bg-muted' : ''}`}>
+                      <div>
+                        <p className="text-sm font-medium">{inst.name}</p>
+                        <p className="text-xs text-muted-foreground">Vencimento: {format(new Date(`${inst.due_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium">{formatCurrency(inst.total_value)}</p>
+                        <Badge variant={statusVariant[inst.status] || "secondary"} className="text-xs">{inst.status}</Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </TabsContent>
           )}
         </Tabs>
-        {account.pix_br_code && (
-          <QRCodeModal
-            isOpen={isQrModalOpen}
-            setIsOpen={setIsQrModalOpen}
-            value={account.pix_br_code}
-          />
-        )}
       </DialogContent>
     </Dialog>
   );
