@@ -64,7 +64,15 @@ serve(async (req) => {
     if (deletePermsError) throw deletePermsError;
 
     if (permissions && permissions.length > 0) {
-        const permsToInsert = permissions.map((p: any) => ({ ...p, user_id: userId }));
+        const permsToInsert = permissions.map((p: any) => ({
+          user_id: userId,
+          management_type: p.management_type,
+          tab: p.tab,
+          can_read: p.can_read,
+          can_write: p.can_write,
+          can_edit: p.can_edit,
+          can_delete: p.can_delete,
+        }));
         const { error: insertPermsError } = await supabaseAdmin
           .from('user_permissions')
           .insert(permsToInsert);
