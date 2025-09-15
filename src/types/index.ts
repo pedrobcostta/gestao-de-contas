@@ -1,3 +1,8 @@
+export interface CustomAttachment {
+  name: string;
+  url: string;
+}
+
 export interface Account {
   id: string;
   user_id: string;
@@ -12,7 +17,9 @@ export interface Account {
   installment_value: number | null;
   payment_proof_url: string | null;
   bill_proof_url: string | null;
-  other_attachments: string[] | null;
+  system_generated_bill_url: string | null;
+  full_report_url: string | null;
+  other_attachments: CustomAttachment[] | null;
   payment_method: "dinheiro" | "pix" | "boleto" | "transferencia" | "cartao" | null;
   payment_bank_id: string | null;
   pix_br_code: string | null;
