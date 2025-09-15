@@ -1,5 +1,5 @@
 import { useFormContext } from "react-hook-form";
-import { FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
+import { FormField, FormControl, FormItem, FormLabel } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const options = [
@@ -11,7 +11,7 @@ const options = [
   { id: "include_installments", label: "Parcelas" },
   { id: "include_payment_date", label: "Data de Pagamento" },
   { id: "include_payment_method", label: "Método de Pagamento" },
-  { id: "include_payment_bank", label: "Banco de Pagamento" },
+  { id: "include_payment_bank_details", label: "Detalhes do Banco de Pagamento" },
   { id: "include_fees_and_fines", label: "Juros e Multas" },
   { id: "include_notes", label: "Observações" },
   { id: "include_bill_proof", label: "Anexo - Fatura/Conta (QR Code)" },

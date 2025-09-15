@@ -38,11 +38,22 @@ const formSchema = z.object({
   account_type: z.enum(["conta_corrente", "poupanca", "cartao_credito"]),
   account_name: z.string().min(1, "O nome da conta é obrigatório."),
   bank_name: z.string().min(1, "O nome do banco é obrigatório."),
+  owner_name: z.string().min(1, "O nome do titular é obrigatório."),
+  owner_cpf: z.string().min(1, "O CPF do titular é obrigatório."),
   agency: z.string().optional().nullable(),
   account_number: z.string().optional().nullable(),
   card_limit: z.coerce.number().optional().nullable(),
   card_closing_day: z.coerce.number().min(1, "O dia deve ser no mínimo 1.").max(31, "O dia deve ser no máximo 31.").optional().nullable(),
   card_due_day: z.coerce.number().min(1, "O dia deve ser no mínimo 1.").max(31, "O dia deve ser no máximo 31.").optional().nullable(),
+  card_last_4_digits: z.string().length(4, "Deve conter 4 dígitos.").optional().nullable(),
+}).refine(data => {
+  if (data.account_type === 'cartao_credito') {
+    return !!data.card_last_4_digits;
+  }
+  return true;
+}, {
+  message: "Os últimos 4 dígitos são obrigatórios para cartões.",
+  path: ["card_last_4_digits"],
 });
 
 interface BankAccountFormProps {
@@ -71,6 +82,8 @@ export function BankAccountForm({ isOpen, setIsOpen, bankAccount, managementType
         account_type: "conta_corrente",
         account_name: "",
         bank_name: "",
+        owner_name: "",
+        owner_cpf: "",
       });
     }
   }, [bankAccount, form]);
@@ -143,8 +156,29 @@ export function BankAccountForm({ isOpen, setIsOpen, bankAccount, managementType
                 <FormMessage />
               </FormItem>
             )} />
+             <FormField control={form.control} name="owner_name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nome do Titular</FormLabel>
+                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+             <FormField control={form.control} name="owner_cpf" render={({ field }) => (
+              <FormItem>
+                <FormLabel>CPF do Titular</FormLabel>
+                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
             {accountType === 'cartao_credito' ? (
               <>
+                <FormField control={form.control} name="card_last_4_digits" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Últimos 4 dígitos do cartão</FormLabel>
+                    <FormControl><Input {...field} maxLength={4} value={field.value ?? ''} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 <FormField control={form.control} name="card_limit" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Limite do Cartão</FormLabel>

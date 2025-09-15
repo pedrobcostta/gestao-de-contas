@@ -41,7 +41,7 @@ const formSchema = z.object({
     include_installments: z.boolean().default(true),
     include_payment_date: z.boolean().default(true),
     include_payment_method: z.boolean().default(true),
-    include_payment_bank: z.boolean().default(true),
+    include_payment_bank_details: z.boolean().default(false),
     include_fees_and_fines: z.boolean().default(true),
     include_notes: z.boolean().default(true),
     include_bill_proof: z.boolean().default(true),
@@ -115,7 +115,7 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
       pdf_options: {
         include_name: true, include_total_value: true, include_due_date: true, include_status: true,
         include_account_type: true, include_installments: true, include_payment_date: true,
-        include_payment_method: true, include_payment_bank: true, include_fees_and_fines: true,
+        include_payment_method: true, include_payment_bank_details: false, include_fees_and_fines: true,
         include_notes: true, include_bill_proof: true, include_payment_proof: true,
         include_owner_signature: false, include_recipient_signature: false,
       },
@@ -159,7 +159,6 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
     const filePath = `${session.user.id}/${uuidv4()}-${file.name}`;
     const { error } = await supabase.storage.from(bucket).upload(filePath, file);
     if (error) {
-      // Throwing the error ensures the entire onSubmit process is halted.
       throw new Error(`Erro no upload do arquivo: ${error.message}`);
     }
     const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
@@ -180,6 +179,8 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
         pdf_options,
         ...dbData
       } = values;
+
+      const paymentBank = bankAccounts.find(b => b.id === values.payment_bank_id);
 
       let billProofUrl = account?.bill_proof_url || null;
       if (bill_proof) billProofUrl = await uploadFile(bill_proof, 'attachments');
@@ -211,7 +212,7 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
       let systemGeneratedBillUrl = account?.system_generated_bill_url || null;
       if (generate_system_bill) {
         const pdfData = { ...baseAccountData, due_date: values.due_date, payment_date: values.payment_date, bill_proof_url_original: billProofUrl, payment_proof_url_original: paymentProofUrl };
-        const file = await generateCustomBillPdf(pdfData, bankAccounts, profile, values.card_last_4_digits || '', pdf_options);
+        const file = await generateCustomBillPdf(pdfData, paymentBank || null, profile, pdf_options);
         systemGeneratedBillUrl = await uploadFile(file, 'generated-bills');
       } else if (account?.system_generated_bill_url) {
         systemGeneratedBillUrl = null;
@@ -220,7 +221,7 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
       const finalBaseAccountData = { ...baseAccountData, system_generated_bill_url: systemGeneratedBillUrl };
 
       if (account) {
-        const reportFile = await generateFullReportPdf(finalBaseAccountData, []);
+        const reportFile = await generateFullReportPdf(finalBaseAccountData, [], paymentBank || null);
         const reportUrl = await uploadFile(reportFile, 'generated-reports');
         const dataToUpdate = { ...finalBaseAccountData, full_report_url: reportUrl };
 
@@ -235,7 +236,7 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
           for (let i = 1; i <= values.installments_total; i++) {
             newAccounts.push({ ...finalBaseAccountData, name: `${values.name}`, due_date: format(addMonths(values.due_date, i - 1), "yyyy-MM-dd"), total_value: installmentValue, installment_current: i, installments_total: values.installments_total, installment_value: installmentValue, group_id: groupId });
           }
-          const reportFile = await generateFullReportPdf({ ...finalBaseAccountData, total_value: values.total_value }, newAccounts);
+          const reportFile = await generateFullReportPdf({ ...finalBaseAccountData, total_value: values.total_value }, newAccounts, paymentBank || null);
           const reportUrl = await uploadFile(reportFile, 'generated-reports');
           newAccounts.forEach(acc => acc.full_report_url = reportUrl);
           const { error } = await supabase.from("accounts").insert(newAccounts);
@@ -250,7 +251,7 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
           const { error } = await supabase.from("accounts").insert(newAccounts);
           if (error) throw error;
         } else {
-          const reportFile = await generateFullReportPdf(finalBaseAccountData, []);
+          const reportFile = await generateFullReportPdf(finalBaseAccountData, [], paymentBank || null);
           const reportUrl = await uploadFile(reportFile, 'generated-reports');
           const dataToInsert = { ...finalBaseAccountData, group_id: groupId, full_report_url: reportUrl };
           const { error } = await supabase.from("accounts").insert([dataToInsert]);

@@ -51,9 +51,12 @@ export interface BankAccount {
   account_name: string;
   agency: string | null;
   account_number: string | null;
+  owner_name: string | null;
+  owner_cpf: string | null;
   card_limit: number | null;
   card_closing_day: number | null;
   card_due_day: number | null;
+  card_last_4_digits: string | null;
   created_at: string;
 }
 
@@ -63,6 +66,16 @@ export interface Profile {
   last_name: string | null;
   updated_at: string;
   role: 'admin' | 'user';
+  cpf: string | null;
+  rg: string | null;
+  birth_date: string | null;
+  address: string | null;
+  birth_certificate_url: string | null;
+  identity_document_front_url: string | null;
+  identity_document_back_url: string | null;
+  identity_document_model: string | null;
+  cnh_url: string | null;
+  voter_id_url: string | null;
 }
 
 export interface User {
