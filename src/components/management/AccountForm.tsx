@@ -244,20 +244,27 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
 
       const recurrence_end_date = values.account_type === 'recorrente' && !values.recurrence_indefinite ? format(values.recurrence_end_date!, "yyyy-MM-dd") : null;
 
+      const dbData = {
+        name: values.name,
+        total_value: values.total_value,
+        due_date: format(values.due_date, "yyyy-MM-dd"),
+        status: values.status,
+        account_type: values.account_type,
+        payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null,
+        payment_method: values.payment_method,
+        payment_bank_id: values.payment_bank_id,
+        fees_and_fines: values.fees_and_fines,
+        notes: values.notes,
+        bill_proof_url: final_bill_proof_url,
+        payment_proof_url: original_payment_proof_url,
+        recurrence_end_date: recurrence_end_date,
+        installment_value: values.account_type === 'parcelada' ? values.total_value : null,
+      };
+
       if (account) { // EDIT
         const { error } = await supabase
           .from("accounts")
-          .update({
-            ...values,
-            due_date: format(values.due_date, "yyyy-MM-dd"),
-            payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null,
-            total_value: values.total_value,
-            installment_value: values.account_type === 'parcelada' ? values.total_value : null,
-            bill_proof_url: final_bill_proof_url,
-            payment_proof_url: original_payment_proof_url,
-            recurrence_end_date,
-            fees_and_fines: values.fees_and_fines,
-          })
+          .update(dbData)
           .eq("id", account.id);
         if (error) throw error;
         showSuccess("Conta atualizada com sucesso!");
@@ -300,15 +307,9 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         } else {
           const { error } = await supabase.from("accounts").insert([
             {
-              ...values,
-              due_date: format(values.due_date, "yyyy-MM-dd"),
-              payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null,
+              ...dbData,
               user_id: session.user.id,
               management_type: managementType,
-              bill_proof_url: final_bill_proof_url,
-              payment_proof_url: original_payment_proof_url,
-              recurrence_end_date,
-              fees_and_fines: values.fees_and_fines,
             },
           ]);
           if (error) throw error;
