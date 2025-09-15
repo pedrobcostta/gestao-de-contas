@@ -152,13 +152,15 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
     }
   }, [account, form]);
 
-  const uploadFile = async (file: File, bucket: string): Promise<string | null> => {
-    if (!session?.user || !file) return null;
+  const uploadFile = async (file: File, bucket: string): Promise<string> => {
+    if (!session?.user || !file) {
+      throw new Error("Usuário ou arquivo inválido para upload.");
+    }
     const filePath = `${session.user.id}/${uuidv4()}-${file.name}`;
     const { error } = await supabase.storage.from(bucket).upload(filePath, file);
     if (error) {
-      showError(`Erro no upload do arquivo: ${error.message}`);
-      return null;
+      // Throwing the error ensures the entire onSubmit process is halted.
+      throw new Error(`Erro no upload do arquivo: ${error.message}`);
     }
     const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
     return data.publicUrl;
@@ -190,7 +192,7 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
         for (const attachment of other_attachments_files) {
           if (attachment.file) {
             const url = await uploadFile(attachment.file, 'attachments');
-            if (url) otherAttachments.push({ name: attachment.name, url });
+            otherAttachments.push({ name: attachment.name, url });
           }
         }
       }
@@ -235,9 +237,7 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
           }
           const reportFile = await generateFullReportPdf({ ...finalBaseAccountData, total_value: values.total_value }, newAccounts);
           const reportUrl = await uploadFile(reportFile, 'generated-reports');
-          if (reportUrl) {
-            newAccounts.forEach(acc => acc.full_report_url = reportUrl);
-          }
+          newAccounts.forEach(acc => acc.full_report_url = reportUrl);
           const { error } = await supabase.from("accounts").insert(newAccounts);
           if (error) throw error;
         } else if (values.account_type === 'recorrente' && values.recurrence_end_date) {
@@ -262,7 +262,7 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       setIsOpen(false);
     } catch (error: any) {
-      showError(`Erro: ${error.message}`);
+      showError(`Erro ao salvar conta: ${error.message}`);
     } finally {
       dismissToast(toastId);
       setIsSubmitting(false);
