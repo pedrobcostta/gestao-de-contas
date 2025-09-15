@@ -21,6 +21,7 @@ import { User } from "@/types";
 import { usersColumns } from "./usersColumns";
 import { supabase } from "@/integrations/supabase/client";
 import { UserForm } from "./UserForm";
+import { UserEditForm } from "./UserEditForm";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
@@ -30,6 +31,8 @@ export function UsersTabContent() {
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
@@ -41,6 +44,11 @@ export function UsersTabContent() {
       return data.users || [];
     }
   });
+
+  const handleEdit = (user: User) => {
+    setSelectedUser(user);
+    setIsEditFormOpen(true);
+  };
 
   const handleDelete = (user: User) => {
     setUserToDelete(user);
@@ -64,7 +72,7 @@ export function UsersTabContent() {
     setUserToDelete(null);
   };
 
-  const tableColumns = usersColumns({ onDelete: handleDelete });
+  const tableColumns = usersColumns({ onEdit: handleEdit, onDelete: handleDelete });
 
   const table = useReactTable({
     data: users,
@@ -92,7 +100,8 @@ export function UsersTabContent() {
                 <p>{format(new Date(user.created_at), "dd/MM/yyyy", { locale: ptBR })}</p>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-end">
+            <CardFooter className="flex justify-end gap-2">
+              <Button size="sm" onClick={() => handleEdit(user)}>Editar</Button>
               <Button variant="destructive" size="sm" onClick={() => handleDelete(user)}>Deletar</Button>
             </CardFooter>
           </Card>
@@ -153,6 +162,13 @@ export function UsersTabContent() {
       </div>
       {isMobile ? renderMobileView() : renderDesktopView()}
       <UserForm isOpen={isFormOpen} setIsOpen={setIsFormOpen} />
+      {selectedUser && (
+        <UserEditForm
+          isOpen={isEditFormOpen}
+          setIsOpen={setIsEditFormOpen}
+          user={selectedUser}
+        />
+      )}
       <ConfirmationDialog
         isOpen={isConfirmOpen}
         onOpenChange={setIsConfirmOpen}

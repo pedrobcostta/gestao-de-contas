@@ -29,6 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import { InstallmentDeleteDialog } from "./InstallmentDeleteDialog";
+import { usePermissions } from "@/contexts/PermissionsProvider";
 
 interface AccountsTabContentProps {
   data: (Account & { subRows?: Account[] })[];
@@ -39,6 +40,7 @@ interface AccountsTabContentProps {
 export function AccountsTabContent({ data, isLoading, managementType }: AccountsTabContentProps) {
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermissions();
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [accountForDetails, setAccountForDetails] = useState<Account | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -116,6 +118,7 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
     onView: handleViewAccount,
     onEdit: handleEditAccount,
     onDelete: handleDeleteAccount,
+    managementType,
   });
 
   const table = useReactTable({
@@ -157,9 +160,9 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
               )}
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => handleViewAccount(account)}>Visualizar</Button>
-              <Button size="sm" onClick={() => handleEditAccount(account)}>Editar</Button>
-              <Button variant="destructive" size="sm" onClick={() => handleDeleteAccount(account)}>Deletar</Button>
+              {hasPermission(managementType, 'contas', 'read') && <Button variant="outline" size="sm" onClick={() => handleViewAccount(account)}>Visualizar</Button>}
+              {hasPermission(managementType, 'contas', 'edit') && <Button size="sm" onClick={() => handleEditAccount(account)}>Editar</Button>}
+              {hasPermission(managementType, 'contas', 'delete') && <Button variant="destructive" size="sm" onClick={() => handleDeleteAccount(account)}>Deletar</Button>}
             </CardFooter>
           </Card>
         ))
@@ -215,7 +218,7 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button onClick={handleAddAccount}>Adicionar Conta</Button>
+        {hasPermission(managementType, 'contas', 'write') && <Button onClick={handleAddAccount}>Adicionar Conta</Button>}
       </div>
       
       {isMobile ? renderMobileView() : renderDesktopView()}

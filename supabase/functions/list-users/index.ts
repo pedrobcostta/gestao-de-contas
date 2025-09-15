@@ -51,7 +51,7 @@ serve(async (req) => {
 
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
-      .select('id, first_name, last_name');
+      .select('id, first_name, last_name, status');
     if (profilesError) throw profilesError;
 
     const profilesMap = new Map(profiles.map(p => [p.id, p]));
@@ -60,6 +60,7 @@ serve(async (req) => {
       ...user,
       first_name: profilesMap.get(user.id)?.first_name || null,
       last_name: profilesMap.get(user.id)?.last_name || null,
+      status: profilesMap.get(user.id)?.status || 'inactive',
     }));
 
     return new Response(JSON.stringify({ users: combinedUsers }), {

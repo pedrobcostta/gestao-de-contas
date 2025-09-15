@@ -67,6 +67,7 @@ export interface Profile {
   last_name: string | null;
   updated_at: string;
   role: 'admin' | 'user';
+  status: 'active' | 'inactive';
   cpf: string | null;
   rg: string | null;
   birth_date: string | null;
@@ -92,4 +93,16 @@ export interface User {
   first_name: string | null;
   last_name: string | null;
   created_at: string;
+  status: 'active' | 'inactive';
 }
+
+export type Permission = {
+  id: string;
+  user_id: string;
+  management_type: string;
+  tab: string;
+  can_read: boolean;
+  can_write: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+};

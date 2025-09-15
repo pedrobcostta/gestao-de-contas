@@ -7,6 +7,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthProvider";
+import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import Pessoal from "./pages/Pessoal";
@@ -23,20 +24,22 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route element={<ProtectedRoute />}>
-              <Route element={<Layout />}>
-                <Route path="/" element={<Home />} />
-                <Route path="/pessoal" element={<Pessoal />} />
-                <Route path="/casa" element={<Casa />} />
-                <Route path="/pai" element={<Pai />} />
-                <Route path="/mae" element={<Mae />} />
+          <PermissionsProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route element={<ProtectedRoute />}>
+                <Route element={<Layout />}>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/pessoal" element={<Pessoal />} />
+                  <Route path="/casa" element={<Casa />} />
+                  <Route path="/pai" element={<Pai />} />
+                  <Route path="/mae" element={<Mae />} />
+                </Route>
               </Route>
-            </Route>
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </PermissionsProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

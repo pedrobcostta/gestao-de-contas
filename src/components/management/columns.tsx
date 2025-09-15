@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Account } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import { usePermissions } from "@/contexts/PermissionsProvider";
 
 const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } = {
   pago: "default",
@@ -24,7 +25,16 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } 
   vencido: "destructive",
 };
 
-export const columns = ({ onView, onEdit, onDelete }: { onView: (account: Account) => void; onEdit: (account: Account) => void; onDelete: (account: Account) => void; }): ColumnDef<Account>[] => {
+interface ColumnsProps {
+  onView: (account: Account) => void;
+  onEdit: (account: Account) => void;
+  onDelete: (account: Account) => void;
+  managementType: string;
+}
+
+export const columns = ({ onView, onEdit, onDelete, managementType }: ColumnsProps): ColumnDef<Account>[] => {
+  const { hasPermission } = usePermissions();
+
   return [
     {
       accessorKey: "name",
@@ -102,16 +112,24 @@ export const columns = ({ onView, onEdit, onDelete }: { onView: (account: Accoun
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => onView(account)}>
-                Visualizar
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit(account)}>
-                Editar
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDelete(account)} className="text-red-600">
-                Deletar
-              </DropdownMenuItem>
+              {hasPermission(managementType, 'contas', 'read') && (
+                <DropdownMenuItem onClick={() => onView(account)}>
+                  Visualizar
+                </DropdownMenuItem>
+              )}
+              {hasPermission(managementType, 'contas', 'edit') && (
+                <DropdownMenuItem onClick={() => onEdit(account)}>
+                  Editar
+                </DropdownMenuItem>
+              )}
+              {hasPermission(managementType, 'contas', 'delete') && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onDelete(account)} className="text-red-600">
+                    Deletar
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )

@@ -16,6 +16,7 @@ import { ConfigurationTabContent } from "./ConfigurationTabContent";
 import { UsersTabContent } from "./UsersTabContent";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { useAuth } from "@/contexts/AuthProvider";
+import { usePermissions } from "@/contexts/PermissionsProvider";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ManagementLayoutProps {
@@ -34,13 +35,14 @@ const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 
 
 const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
   const { session } = useAuth();
+  const { hasPermission } = usePermissions();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [statusFilter, setStatusFilter] = useState('todas');
   const [typeFilter, setTypeFilter] = useState('todas');
 
   const { data: profile } = useQuery<Profile | null>({
-    queryKey: ['profile', session?.user?.id, 'admin_check'], // Unique key for this specific query
+    queryKey: ['profile', session?.user?.id, 'admin_check'],
     queryFn: async () => {
       if (!session?.user?.id) return null;
       const { data, error } = await supabase
@@ -49,7 +51,7 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
         .eq('id', session.user.id)
         .limit(1)
         .single();
-      if (error && error.code !== 'PGRST116') { // Ignore 'exact one row' error if no profile exists
+      if (error && error.code !== 'PGRST116') {
         console.error("Error fetching admin role:", error);
         return null;
       }
@@ -239,13 +241,13 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
 
       <Tabs defaultValue="contas" className="space-y-4">
         <TabsList className="overflow-x-auto w-full justify-start">
-          <TabsTrigger value="contas">Gestão de Contas</TabsTrigger>
-          <TabsTrigger value="pix">Gestão de PIX</TabsTrigger>
-          <TabsTrigger value="bancos">Gestão de Bancos</TabsTrigger>
-          <TabsTrigger value="pagas">Contas Pagas</TabsTrigger>
-          <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
-          {isAdmin && <TabsTrigger value="usuarios">Gestão de Usuários</TabsTrigger>}
-          <TabsTrigger value="perfil">Perfil</TabsTrigger>
+          {hasPermission(managementType, 'contas', 'read') && <TabsTrigger value="contas">Gestão de Contas</TabsTrigger>}
+          {hasPermission(managementType, 'pix', 'read') && <TabsTrigger value="pix">Gestão de PIX</TabsTrigger>}
+          {hasPermission(managementType, 'bancos', 'read') && <TabsTrigger value="bancos">Gestão de Bancos</TabsTrigger>}
+          {hasPermission(managementType, 'pagas', 'read') && <TabsTrigger value="pagas">Contas Pagas</TabsTrigger>}
+          {hasPermission(managementType, 'relatorios', 'read') && <TabsTrigger value="relatorios">Relatórios</TabsTrigger>}
+          {isAdmin && hasPermission(managementType, 'usuarios', 'read') && <TabsTrigger value="usuarios">Gestão de Usuários</TabsTrigger>}
+          {hasPermission(managementType, 'perfil', 'read') && <TabsTrigger value="perfil">Perfil</TabsTrigger>}
         </TabsList>
         <TabsContent value="contas">
           <Card>

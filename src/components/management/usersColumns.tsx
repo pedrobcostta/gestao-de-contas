@@ -13,9 +13,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge";
 import { User } from "@/types";
 
-export const usersColumns = ({ onDelete }: { onDelete: (user: User) => void; }): ColumnDef<User>[] => [
+export const usersColumns = ({ onEdit, onDelete }: { onEdit: (user: User) => void; onDelete: (user: User) => void; }): ColumnDef<User>[] => [
   {
     accessorKey: "first_name",
     header: "Nome",
@@ -27,6 +28,18 @@ export const usersColumns = ({ onDelete }: { onDelete: (user: User) => void; }):
   {
     accessorKey: "email",
     header: "E-mail",
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => {
+      const status = row.original.status;
+      return (
+        <Badge variant={status === 'active' ? 'default' : 'destructive'}>
+          {status === 'active' ? 'Ativo' : 'Inativo'}
+        </Badge>
+      );
+    },
   },
   {
     accessorKey: "created_at",
@@ -48,6 +61,9 @@ export const usersColumns = ({ onDelete }: { onDelete: (user: User) => void; }):
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Ações</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => onEdit(user)}>
+              Editar
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onDelete(user)} className="text-red-600">
               Deletar
             </DropdownMenuItem>
