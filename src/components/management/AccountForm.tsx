@@ -166,12 +166,14 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
       const other_attachments: CustomAttachment[] = account?.other_attachments || [];
       if (values.other_attachments_form) {
         for (const attachment of values.other_attachments_form) {
-          const url = await uploadFile(attachment.file[0], session.user.id);
-          if (url) other_attachments.push({ name: attachment.name, url });
+          if (attachment.file && attachment.file.length > 0) {
+            const url = await uploadFile(attachment.file[0], session.user.id);
+            if (url) other_attachments.push({ name: attachment.name, url });
+          }
         }
       }
 
-      const basePdfData = { ...values, due_date: format(values.due_date, "yyyy-MM-dd"), payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null, bill_proof_url_original: bill_proof_url, payment_proof_url_original: payment_proof_url, other_attachments, };
+      const basePdfData = { ...values, bill_proof_url, payment_proof_url, other_attachments };
 
       let system_generated_bill_url = account?.system_generated_bill_url || null;
       if (values.generate_bill_proof) {
@@ -179,24 +181,61 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         system_generated_bill_url = await uploadFile(pdfFile, session.user.id);
       }
 
-      let relatedInstallments: Account[] = [];
-      if (account?.group_id) {
-        const { data } = await supabase.from('accounts').select('*').eq('group_id', account.group_id);
-        relatedInstallments = data || [];
-      }
-      const reportPdfFile = await generateFullReportPdf(basePdfData, relatedInstallments);
-      const full_report_url = await uploadFile(reportPdfFile, session.user.id);
+      const commonDbData = {
+        name: values.name,
+        status: values.status,
+        account_type: values.account_type,
+        payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null,
+        payment_method: values.payment_method,
+        payment_bank_id: values.payment_bank_id,
+        fees_and_fines: values.fees_and_fines,
+        notes: values.notes,
+        bill_proof_url,
+        payment_proof_url,
+        other_attachments,
+        system_generated_bill_url,
+        recurrence_end_date: values.account_type === 'recorrente' && !values.recurrence_indefinite ? format(values.recurrence_end_date!, "yyyy-MM-dd") : null,
+      };
 
-      const dbData = { name: values.name, total_value: values.total_value, due_date: format(values.due_date, "yyyy-MM-dd"), status: values.status, account_type: values.account_type, payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null, payment_method: values.payment_method, payment_bank_id: values.payment_bank_id, fees_and_fines: values.fees_and_fines, notes: values.notes, bill_proof_url, payment_proof_url, other_attachments, system_generated_bill_url, full_report_url, recurrence_end_date: values.account_type === 'recorrente' && !values.recurrence_indefinite ? format(values.recurrence_end_date!, "yyyy-MM-dd") : null, installment_value: values.account_type === 'parcelada' ? values.total_value : null, };
-      
       if (account) {
-        const { error } = await supabase.from("accounts").update(dbData).eq("id", account.id);
+        const reportPdfFile = await generateFullReportPdf({ ...account, ...commonDbData }, []);
+        const full_report_url = await uploadFile(reportPdfFile, session.user.id);
+        const updateData = { ...commonDbData, total_value: values.total_value, due_date: format(values.due_date, "yyyy-MM-dd"), installment_value: values.account_type === 'parcelada' ? values.total_value : null, full_report_url };
+        const { error } = await supabase.from("accounts").update(updateData).eq("id", account.id);
         if (error) throw error;
         showSuccess("Conta atualizada com sucesso!");
       } else {
-        const { error } = await supabase.from("accounts").insert([{ ...dbData, user_id: session.user.id, management_type: managementType }]);
-        if (error) throw error;
-        showSuccess("Conta criada com sucesso!");
+        if (values.account_type === 'parcelada' && values.installments_total) {
+          const groupId = uuidv4();
+          const installmentValue = values.is_total_value ? values.total_value / values.installments_total : values.total_value;
+          const initialInstallment = values.initial_installment || 1;
+          const createdInstallments = [];
+
+          for (let i = 0; i < values.installments_total; i++) {
+            const currentInstallment = initialInstallment + i;
+            const dueDate = new Date(values.due_date);
+            dueDate.setMonth(dueDate.getMonth() + i);
+            const installmentData = { ...commonDbData, user_id: session.user.id, management_type: managementType, total_value: installmentValue, installment_value: installmentValue, due_date: format(dueDate, "yyyy-MM-dd"), installments_total: values.installments_total, installment_current: currentInstallment, group_id: groupId, name: `${values.name} ${currentInstallment}/${values.installments_total}`, bill_proof_url: i === 0 ? bill_proof_url : null, other_attachments: i === 0 ? other_attachments : null, system_generated_bill_url: i === 0 ? system_generated_bill_url : null };
+            createdInstallments.push(installmentData);
+          }
+          
+          const reportPdfFile = await generateFullReportPdf(createdInstallments[0], createdInstallments);
+          const full_report_url = await uploadFile(reportPdfFile, session.user.id);
+          if (createdInstallments.length > 0) {
+            createdInstallments[0].full_report_url = full_report_url;
+          }
+
+          const { error } = await supabase.from("accounts").insert(createdInstallments);
+          if (error) throw error;
+          showSuccess("Contas parceladas criadas com sucesso!");
+        } else {
+          const reportPdfFile = await generateFullReportPdf({ ...commonDbData, total_value: values.total_value, due_date: format(values.due_date, "yyyy-MM-dd") }, []);
+          const full_report_url = await uploadFile(reportPdfFile, session.user.id);
+          const insertData = { ...commonDbData, user_id: session.user.id, management_type: managementType, total_value: values.total_value, due_date: format(values.due_date, "yyyy-MM-dd"), full_report_url };
+          const { error } = await supabase.from("accounts").insert([insertData]);
+          if (error) throw error;
+          showSuccess("Conta criada com sucesso!");
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
@@ -231,8 +270,28 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
             <FormField control={form.control} name="notes" render={({ field }) => ( <FormItem> <FormLabel>Observações</FormLabel> <FormControl><Textarea placeholder="Qualquer detalhe adicional..." {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem> )} />
             <div className="col-span-1 md:col-span-2 space-y-2">
               <FormLabel>Outros Anexos</FormLabel>
-              {fields.map((field, index) => ( <div key={field.id} className="flex items-center gap-2 p-2 border rounded-md"> <FormField control={form.control} name={`other_attachments_form.${index}.name`} render={({ field }) => ( <Input {...field} placeholder="Nome do anexo" className="flex-grow" /> )} /> <FormField control={form.control} name={`other_attachments_form.${index}.file`} render={({ field }) => ( <Input type="file" onChange={(e) => field.onChange(e.target.files)} className="flex-grow" /> )} /> <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}> <XCircle className="h-5 w-5 text-red-500" /> </Button> </div> ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ name: '', file: new DataTransfer().files })}> <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Anexo </Button>
+              {fields.map((field, index) => (
+                <div key={field.id} className="flex items-center gap-2 p-2 border rounded-md">
+                  <FormField control={form.control} name={`other_attachments_form.${index}.name`} render={({ field }) => (
+                    <FormItem className="flex-grow">
+                      <FormControl><Input {...field} placeholder="Nome do anexo" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name={`other_attachments_form.${index}.file`} render={({ field: { onChange, ...rest } }) => (
+                    <FormItem className="flex-grow">
+                      <FormControl><Input type="file" onChange={(e) => onChange(e.target.files)} {...rest} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                    <XCircle className="h-5 w-5 text-red-500" />
+                  </Button>
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" onClick={() => append({ name: '', file: new DataTransfer().files })}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Anexo
+              </Button>
             </div>
             <FormField control={form.control} name="generate_bill_proof" render={({ field }) => ( <FormItem className="flex flex-row items-center space-x-2 pt-2"> <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl> <FormLabel>Gerar fatura/conta customizada em PDF</FormLabel> </FormItem> )} />
             {generateBillProof && <PdfOptionsForm />}
