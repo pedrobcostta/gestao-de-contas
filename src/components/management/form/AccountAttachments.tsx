@@ -16,7 +16,7 @@ export const AccountAttachments = () => {
   return (
     <div className="col-span-1 md:col-span-2 space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormField control={control} name="bill_proof" render={({ field: { onChange, ...props } }) => (
+        <FormField control={control} name="bill_proof" render={({ field: { onChange, value, ...props } }) => (
           <FormItem>
             <FormLabel>Fatura / Conta</FormLabel>
             <FormControl>
@@ -26,7 +26,7 @@ export const AccountAttachments = () => {
           </FormItem>
         )} />
         {status === 'pago' && (
-          <FormField control={control} name="payment_proof" render={({ field: { onChange, ...props } }) => (
+          <FormField control={control} name="payment_proof" render={({ field: { onChange, value, ...props } }) => (
             <FormItem>
               <FormLabel>Comprovante de Pagamento</FormLabel>
               <FormControl>
@@ -58,7 +58,7 @@ export const AccountAttachments = () => {
               <FormField
                 control={control}
                 name={`other_attachments_files.${index}.file`}
-                render={({ field: { onChange, ...props } }) => (
+                render={({ field: { onChange, value, ...props } }) => (
                   <FormItem className="flex-grow">
                      <FormLabel className="text-xs">Arquivo</FormLabel>
                     <FormControl>
