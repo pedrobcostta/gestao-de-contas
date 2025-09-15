@@ -86,7 +86,47 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
   }, [accounts, statusFilter, typeFilter]);
 
   const processedData = useMemo(() => {
-    return filteredAccounts.sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+    const groups = new Map<string, Account[]>();
+    const singleAccounts: (Account & { subRows?: Account[] })[] = [];
+
+    for (const account of filteredAccounts) {
+      if (account.account_type === 'parcelada' && account.group_id) {
+        if (!groups.has(account.group_id)) {
+          groups.set(account.group_id, []);
+        }
+        groups.get(account.group_id)!.push(account);
+      } else {
+        singleAccounts.push(account);
+      }
+    }
+
+    const groupedAccounts: (Account & { subRows?: Account[] })[] = [];
+    for (const [groupId, subRows] of groups.entries()) {
+      subRows.sort((a, b) => (a.installment_current || 0) - (b.installment_current || 0));
+      
+      const firstInstallment = subRows[0];
+      const totalValue = subRows.reduce((sum, inst) => sum + inst.total_value, 0);
+      
+      let parentStatus: Account['status'] = 'pago';
+      if (subRows.some(inst => inst.status === 'vencido')) {
+        parentStatus = 'vencido';
+      } else if (subRows.some(inst => inst.status === 'pendente')) {
+        parentStatus = 'pendente';
+      }
+
+      const parentRow: Account & { subRows: Account[] } = {
+        ...firstInstallment,
+        id: groupId,
+        total_value: totalValue,
+        status: parentStatus,
+        name: firstInstallment.name,
+        installment_current: null,
+        subRows: subRows,
+      };
+      groupedAccounts.push(parentRow);
+    }
+
+    return [...singleAccounts, ...groupedAccounts].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
   }, [filteredAccounts]);
 
   const summary = accounts.reduce((acc, account) => {
