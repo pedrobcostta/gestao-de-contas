@@ -50,12 +50,12 @@ export function AccountDetails({ isOpen, setIsOpen, account }: { isOpen: boolean
   const { data: installments = [], isLoading: isLoadingInstallments } = useQuery<Account[]>({
     queryKey: ['installments', account?.group_id],
     queryFn: async () => {
-      if (!account?.group_id) return [];
+      if (!account?.group_id || account.account_type !== 'parcelada') return [];
       const { data, error } = await supabase.from('accounts').select('*').eq('group_id', account.group_id).order('installment_current');
       if (error) throw error;
       return data || [];
     },
-    enabled: !!account && !!account.group_id,
+    enabled: !!account && account.account_type === 'parcelada' && !!account.group_id,
   });
 
   if (!account) return null;
