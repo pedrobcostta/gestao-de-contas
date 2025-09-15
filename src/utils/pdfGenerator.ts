@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import QRCode from 'qrcode';
-import { Account, BankAccount, Profile } from "@/types";
+import { Account, BankAccount, Profile, CustomAttachment } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -99,6 +99,27 @@ export const generateFullReportPdf = async (
   accountData: any, relatedInstallments: Account[]
 ): Promise<File> => {
   const doc = new jsPDF();
+
+  const addQrCodeToReport = async (label: string, url: string | null | undefined, startY: number): Promise<number> => {
+    let finalY = startY;
+    if (url) {
+      try {
+        const qrCodeImage = await QRCode.toDataURL(url);
+        if (finalY + 40 > doc.internal.pageSize.height) {
+          doc.addPage();
+          finalY = 20;
+        }
+        doc.setFontSize(10);
+        doc.text(label, 14, finalY);
+        doc.addImage(qrCodeImage, 'PNG', 14, finalY + 2, 30, 30);
+        finalY += 40;
+      } catch (err) {
+        console.error(`Failed to generate QR code for ${label}`, err);
+      }
+    }
+    return finalY;
+  };
+
   doc.text(`Relatório Completo da Conta: ${accountData.name}`, 14, 22);
 
   const body = [
@@ -135,6 +156,27 @@ export const generateFullReportPdf = async (
         inst.status
       ]),
     });
+    finalY = (doc as any).lastAutoTable.finalY;
+  }
+
+  // Add attachments section
+  finalY += 10;
+  if (finalY + 10 > doc.internal.pageSize.height) {
+    doc.addPage();
+    finalY = 20;
+  }
+  doc.setFontSize(12);
+  doc.text("Anexos (QR Codes)", 14, finalY);
+  finalY += 5;
+
+  finalY = await addQrCodeToReport("Fatura (Gerada pelo Sistema)", accountData.system_generated_bill_url, finalY);
+  finalY = await addQrCodeToReport("Fatura/Conta (Upload)", accountData.bill_proof_url, finalY);
+  finalY = await addQrCodeToReport("Comprovante de Pagamento", accountData.payment_proof_url, finalY);
+
+  if (accountData.other_attachments && accountData.other_attachments.length > 0) {
+    for (const attachment of accountData.other_attachments) {
+      finalY = await addQrCodeToReport(`Anexo: ${attachment.name}`, attachment.url, finalY);
+    }
   }
 
   const pdfBlob = doc.output('blob');
