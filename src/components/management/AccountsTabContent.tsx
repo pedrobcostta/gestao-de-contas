@@ -27,6 +27,8 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
+import { ConfirmationDialog } from "@/components/ConfirmationDialog";
+import { InstallmentDeleteDialog } from "./InstallmentDeleteDialog";
 
 interface AccountsTabContentProps {
   data: (Account & { subRows?: Account[] })[];
@@ -41,6 +43,10 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
   const [accountForDetails, setAccountForDetails] = useState<Account | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isInstallmentConfirmOpen, setIsInstallmentConfirmOpen] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
 
   const handleViewAccount = (account: Account) => {
     setAccountForDetails(account);
@@ -57,34 +63,53 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
     setIsFormOpen(true);
   };
 
-  const handleDeleteAccount = async (account: Account) => {
-    let error = null;
-    let successMessage = "";
-
-    if (account.group_id && account.account_type === 'parcelada') {
-      if (confirm("Esta é uma conta parcelada. Deseja deletar TODAS as parcelas relacionadas a esta compra?")) {
-        const { error: deleteError } = await supabase.from('accounts').delete().eq('group_id', account.group_id);
-        error = deleteError;
-        successMessage = "Todas as parcelas foram deletadas com sucesso!";
-      } else {
-        const { error: deleteError } = await supabase.from('accounts').delete().eq('id', account.id);
-        error = deleteError;
-        successMessage = "Apenas esta parcela foi deletada com sucesso!";
-      }
+  const handleDeleteAccount = (account: Account) => {
+    setAccountToDelete(account);
+    if (account.group_id && account.account_type === 'parcelada' && !account.subRows) {
+      setIsInstallmentConfirmOpen(true);
     } else {
-      if (confirm(`Tem certeza que deseja deletar a conta "${account.name}"?`)) {
-        const { error: deleteError } = await supabase.from('accounts').delete().eq('id', account.id);
-        error = deleteError;
-        successMessage = "Conta deletada com sucesso!";
-      }
+      setIsConfirmOpen(true);
     }
+  };
 
+  const confirmDeleteSingle = async () => {
+    if (!accountToDelete) return;
+    const { error } = await supabase.from('accounts').delete().eq('id', accountToDelete.id);
     if (error) {
       showError(`Erro ao deletar: ${error.message}`);
-    } else if (successMessage) {
-      showSuccess(successMessage);
+    } else {
+      showSuccess("Apenas esta parcela foi deletada com sucesso!");
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
     }
+    setIsInstallmentConfirmOpen(false);
+    setAccountToDelete(null);
+  };
+
+  const confirmDeleteAll = async () => {
+    if (!accountToDelete?.group_id) return;
+    const { error } = await supabase.from('accounts').delete().eq('group_id', accountToDelete.group_id);
+    if (error) {
+      showError(`Erro ao deletar: ${error.message}`);
+    } else {
+      showSuccess("Todas as parcelas foram deletadas com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    }
+    setIsInstallmentConfirmOpen(false);
+    setIsConfirmOpen(false);
+    setAccountToDelete(null);
+  };
+
+  const confirmDeleteRegular = async () => {
+    if (!accountToDelete) return;
+    const { error } = await supabase.from('accounts').delete().eq('id', accountToDelete.id);
+    if (error) {
+      showError(`Erro ao deletar: ${error.message}`);
+    } else {
+      showSuccess("Conta deletada com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    }
+    setIsConfirmOpen(false);
+    setAccountToDelete(null);
   };
 
   const tableColumns = columns({
@@ -98,7 +123,7 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
     columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
-    getRowCanExpand: row => "subRows" in row.original,
+    getRowCanExpand: row => !!row.original.subRows,
   });
 
   const renderMobileView = () => (
@@ -205,6 +230,20 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
         setIsOpen={setIsFormOpen}
         account={selectedAccount}
         managementType={managementType}
+      />
+      <ConfirmationDialog
+        isOpen={isConfirmOpen}
+        onOpenChange={setIsConfirmOpen}
+        onConfirm={accountToDelete?.subRows ? confirmDeleteAll : confirmDeleteRegular}
+        title="Confirmar Deleção"
+        description={`Tem certeza que deseja deletar a conta "${accountToDelete?.name}"?`}
+      />
+      <InstallmentDeleteDialog
+        isOpen={isInstallmentConfirmOpen}
+        onOpenChange={setIsInstallmentConfirmOpen}
+        onDeleteSingle={confirmDeleteSingle}
+        onDeleteAll={confirmDeleteAll}
+        accountName={accountToDelete?.name || ""}
       />
     </div>
   );

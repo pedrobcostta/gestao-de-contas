@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   flexRender,
   getCoreRowModel,
@@ -23,10 +23,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { UserForm } from "./UserForm";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmationDialog } from "@/components/ConfirmationDialog";
+import { showError, showSuccess } from "@/utils/toast";
 
 export function UsersTabContent() {
   const isMobile = useIsMobile();
+  const queryClient = useQueryClient();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
@@ -37,9 +42,33 @@ export function UsersTabContent() {
     }
   });
 
+  const handleDelete = (user: User) => {
+    setUserToDelete(user);
+    setIsConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
+
+    const { error } = await supabase.functions.invoke('delete-user', {
+      body: { id: userToDelete.id },
+    });
+
+    if (error) {
+      showError(`Erro ao deletar usuário: ${error.message}`);
+    } else {
+      showSuccess('Usuário deletado com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    }
+    setIsConfirmOpen(false);
+    setUserToDelete(null);
+  };
+
+  const tableColumns = usersColumns({ onDelete: handleDelete });
+
   const table = useReactTable({
     data: users,
-    columns: usersColumns,
+    columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
   });
 
@@ -64,7 +93,7 @@ export function UsersTabContent() {
               </div>
             </CardContent>
             <CardFooter className="flex justify-end">
-              {/* Ações como deletar podem ser adicionadas aqui se necessário */}
+              <Button variant="destructive" size="sm" onClick={() => handleDelete(user)}>Deletar</Button>
             </CardFooter>
           </Card>
         ))
@@ -91,7 +120,7 @@ export function UsersTabContent() {
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={usersColumns.length} className="h-24 text-center">
+              <TableCell colSpan={tableColumns.length} className="h-24 text-center">
                 Carregando...
               </TableCell>
             </TableRow>
@@ -107,7 +136,7 @@ export function UsersTabContent() {
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={usersColumns.length} className="h-24 text-center">
+              <TableCell colSpan={tableColumns.length} className="h-24 text-center">
                 Nenhum usuário encontrado.
               </TableCell>
             </TableRow>
@@ -124,6 +153,13 @@ export function UsersTabContent() {
       </div>
       {isMobile ? renderMobileView() : renderDesktopView()}
       <UserForm isOpen={isFormOpen} setIsOpen={setIsFormOpen} />
+      <ConfirmationDialog
+        isOpen={isConfirmOpen}
+        onOpenChange={setIsConfirmOpen}
+        onConfirm={confirmDelete}
+        title="Confirmar Deleção"
+        description={`Tem certeza que deseja deletar o usuário ${userToDelete?.email}?`}
+      />
     </div>
   );
 }

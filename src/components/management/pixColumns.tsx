@@ -2,7 +2,6 @@
 
 import { ColumnDef } from "@tanstack/react-table"
 import { MoreHorizontal, Copy, QrCode } from "lucide-react"
-import { useQueryClient } from "@tanstack/react-query"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -15,8 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge";
 import { PixKey } from "@/types";
-import { supabase } from "@/integrations/supabase/client";
-import { showError, showSuccess } from "@/utils/toast";
+import { showSuccess } from "@/utils/toast";
 
 const keyTypeLabels: { [key: string]: string } = {
   cpf_cnpj: "CPF/CNPJ",
@@ -26,19 +24,7 @@ const keyTypeLabels: { [key: string]: string } = {
   br_code: "Copia e Cola",
 };
 
-export const pixColumns = ({ onEdit, onViewQr }: { onEdit: (pixKey: PixKey) => void; onViewQr: (pixKey: PixKey) => void; }): ColumnDef<PixKey>[] => {
-  const queryClient = useQueryClient();
-
-  const handleDelete = async (pixKeyId: string) => {
-    const { error } = await supabase.from('pix_keys').delete().eq('id', pixKeyId);
-    if (error) {
-      showError("Erro ao deletar chave PIX.");
-    } else {
-      showSuccess("Chave PIX deletada com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ['pix_keys'] });
-    }
-  };
-
+export const pixColumns = ({ onEdit, onViewQr, onDelete }: { onEdit: (pixKey: PixKey) => void; onViewQr: (pixKey: PixKey) => void; onDelete: (pixKey: PixKey) => void; }): ColumnDef<PixKey>[] => {
   return [
     {
       accessorKey: "key_type",
@@ -108,7 +94,7 @@ export const pixColumns = ({ onEdit, onViewQr }: { onEdit: (pixKey: PixKey) => v
                 Editar
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleDelete(pixKey.id)} className="text-red-600">
+              <DropdownMenuItem onClick={() => onDelete(pixKey)} className="text-red-600">
                 Deletar
               </DropdownMenuItem>
             </DropdownMenuContent>

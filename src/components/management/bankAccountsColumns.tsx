@@ -2,7 +2,6 @@
 
 import { ColumnDef } from "@tanstack/react-table"
 import { MoreHorizontal } from "lucide-react"
-import { useQueryClient } from "@tanstack/react-query"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -15,8 +14,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge";
 import { BankAccount } from "@/types";
-import { supabase } from "@/integrations/supabase/client";
-import { showError, showSuccess } from "@/utils/toast";
 import { formatCurrency } from "@/lib/utils"
 
 const accountTypeLabels: { [key: string]: string } = {
@@ -25,19 +22,7 @@ const accountTypeLabels: { [key: string]: string } = {
   cartao_credito: "Cartão de Crédito",
 };
 
-export const bankAccountsColumns = ({ onEdit }: { onEdit: (bankAccount: BankAccount) => void; }): ColumnDef<BankAccount>[] => {
-  const queryClient = useQueryClient();
-
-  const handleDelete = async (bankAccountId: string) => {
-    const { error } = await supabase.from('bank_accounts').delete().eq('id', bankAccountId);
-    if (error) {
-      showError("Erro ao deletar conta bancária.");
-    } else {
-      showSuccess("Conta bancária deletada com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ['bank_accounts'] });
-    }
-  };
-
+export const bankAccountsColumns = ({ onEdit, onDelete }: { onEdit: (bankAccount: BankAccount) => void; onDelete: (bankAccount: BankAccount) => void; }): ColumnDef<BankAccount>[] => {
   return [
     {
       accessorKey: "account_name",
@@ -78,7 +63,7 @@ export const bankAccountsColumns = ({ onEdit }: { onEdit: (bankAccount: BankAcco
                 Editar
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleDelete(bankAccount.id)} className="text-red-600">
+              <DropdownMenuItem onClick={() => onDelete(bankAccount)} className="text-red-600">
                 Deletar
               </DropdownMenuItem>
             </DropdownMenuContent>

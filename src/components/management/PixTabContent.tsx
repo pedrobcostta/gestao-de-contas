@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   flexRender,
   getCoreRowModel,
@@ -22,6 +22,8 @@ import { PixForm } from "./PixForm";
 import { QRCodeModal } from "./QRCodeModal";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmationDialog } from "@/components/ConfirmationDialog";
+import { showError, showSuccess } from "@/utils/toast";
 
 interface PixTabContentProps {
   managementType: PixKey["management_type"];
@@ -37,10 +39,13 @@ const keyTypeLabels: { [key: string]: string } = {
 
 export function PixTabContent({ managementType }: PixTabContentProps) {
   const isMobile = useIsMobile();
+  const queryClient = useQueryClient();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPixKey, setSelectedPixKey] = useState<PixKey | null>(null);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [qrCodeValue, setQrCodeValue] = useState("");
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [pixKeyToDelete, setPixKeyToDelete] = useState<PixKey | null>(null);
 
   const { data: pixKeys = [], isLoading } = useQuery({
     queryKey: ['pix_keys', managementType],
@@ -72,7 +77,25 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
     }
   };
 
-  const tableColumns = pixColumns({ onEdit: handleEdit, onViewQr: handleViewQr });
+  const handleDelete = (pixKey: PixKey) => {
+    setPixKeyToDelete(pixKey);
+    setIsConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!pixKeyToDelete) return;
+    const { error } = await supabase.from('pix_keys').delete().eq('id', pixKeyToDelete.id);
+    if (error) {
+      showError("Erro ao deletar chave PIX.");
+    } else {
+      showSuccess("Chave PIX deletada com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ['pix_keys'] });
+    }
+    setIsConfirmOpen(false);
+    setPixKeyToDelete(null);
+  };
+
+  const tableColumns = pixColumns({ onEdit: handleEdit, onViewQr: handleViewQr, onDelete: handleDelete });
 
   const table = useReactTable({
     data: pixKeys,
@@ -104,8 +127,9 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
                 <p>{key.bank_name}</p>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-end">
+            <CardFooter className="flex justify-end gap-2">
               <Button size="sm" onClick={() => handleEdit(key)}>Editar</Button>
+              <Button variant="destructive" size="sm" onClick={() => handleDelete(key)}>Deletar</Button>
             </CardFooter>
           </Card>
         ))
@@ -174,6 +198,13 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
         isOpen={isQrModalOpen}
         setIsOpen={setIsQrModalOpen}
         value={qrCodeValue}
+      />
+      <ConfirmationDialog
+        isOpen={isConfirmOpen}
+        onOpenChange={setIsConfirmOpen}
+        onConfirm={confirmDelete}
+        title="Confirmar Deleção"
+        description={`Tem certeza que deseja deletar a chave PIX "${pixKeyToDelete?.key_value}"?`}
       />
     </div>
   );

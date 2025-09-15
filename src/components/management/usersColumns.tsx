@@ -2,7 +2,6 @@
 
 import { ColumnDef } from "@tanstack/react-table"
 import { MoreHorizontal } from "lucide-react"
-import { useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -15,10 +14,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { User } from "@/types";
-import { supabase } from "@/integrations/supabase/client";
-import { showError, showSuccess } from "@/utils/toast";
 
-export const usersColumns: ColumnDef<User>[] = [
+export const usersColumns = ({ onDelete }: { onDelete: (user: User) => void; }): ColumnDef<User>[] => [
   {
     accessorKey: "first_name",
     header: "Nome",
@@ -40,22 +37,6 @@ export const usersColumns: ColumnDef<User>[] = [
     id: "actions",
     cell: ({ row }) => {
       const user = row.original
-      const queryClient = useQueryClient();
-
-      const handleDelete = async () => {
-        if (!confirm(`Tem certeza que deseja deletar o usuário ${user.email}?`)) return;
-
-        const { error } = await supabase.functions.invoke('delete-user', {
-          body: { id: user.id },
-        });
-
-        if (error) {
-          showError(`Erro ao deletar usuário: ${error.message}`);
-        } else {
-          showSuccess('Usuário deletado com sucesso!');
-          queryClient.invalidateQueries({ queryKey: ['users'] });
-        }
-      };
 
       return (
         <DropdownMenu>
@@ -67,7 +48,7 @@ export const usersColumns: ColumnDef<User>[] = [
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Ações</DropdownMenuLabel>
-            <DropdownMenuItem onClick={handleDelete} className="text-red-600">
+            <DropdownMenuItem onClick={() => onDelete(user)} className="text-red-600">
               Deletar
             </DropdownMenuItem>
           </DropdownMenuContent>

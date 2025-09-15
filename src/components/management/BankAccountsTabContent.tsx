@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   flexRender,
   getCoreRowModel,
@@ -21,6 +21,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { BankAccountForm } from "./BankAccountForm";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmationDialog } from "@/components/ConfirmationDialog";
+import { showError, showSuccess } from "@/utils/toast";
 
 interface BankAccountsTabContentProps {
   managementType: BankAccount["management_type"];
@@ -34,8 +36,11 @@ const accountTypeLabels: { [key: string]: string } = {
 
 export function BankAccountsTabContent({ managementType }: BankAccountsTabContentProps) {
   const isMobile = useIsMobile();
+  const queryClient = useQueryClient();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedBankAccount, setSelectedBankAccount] = useState<BankAccount | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [bankAccountToDelete, setBankAccountToDelete] = useState<BankAccount | null>(null);
 
   const { data: bankAccounts = [], isLoading } = useQuery({
     queryKey: ['bank_accounts', managementType],
@@ -60,7 +65,25 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
     setIsFormOpen(true);
   };
 
-  const tableColumns = bankAccountsColumns({ onEdit: handleEdit });
+  const handleDelete = (bankAccount: BankAccount) => {
+    setBankAccountToDelete(bankAccount);
+    setIsConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!bankAccountToDelete) return;
+    const { error } = await supabase.from('bank_accounts').delete().eq('id', bankAccountToDelete.id);
+    if (error) {
+      showError("Erro ao deletar conta bancária.");
+    } else {
+      showSuccess("Conta bancária deletada com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ['bank_accounts'] });
+    }
+    setIsConfirmOpen(false);
+    setBankAccountToDelete(null);
+  };
+
+  const tableColumns = bankAccountsColumns({ onEdit: handleEdit, onDelete: handleDelete });
 
   const table = useReactTable({
     data: bankAccounts,
@@ -88,8 +111,9 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
                 <p>{accountTypeLabels[account.account_type]}</p>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-end">
+            <CardFooter className="flex justify-end gap-2">
               <Button size="sm" onClick={() => handleEdit(account)}>Editar</Button>
+              <Button variant="destructive" size="sm" onClick={() => handleDelete(account)}>Deletar</Button>
             </CardFooter>
           </Card>
         ))
@@ -153,6 +177,13 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
         setIsOpen={setIsFormOpen}
         bankAccount={selectedBankAccount}
         managementType={managementType}
+      />
+      <ConfirmationDialog
+        isOpen={isConfirmOpen}
+        onOpenChange={setIsConfirmOpen}
+        onConfirm={confirmDelete}
+        title="Confirmar Deleção"
+        description={`Tem certeza que deseja deletar a conta "${bankAccountToDelete?.account_name}"? Esta ação não pode ser desfeita.`}
       />
     </div>
   );
