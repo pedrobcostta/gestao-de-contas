@@ -97,8 +97,8 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
     name: "other_attachments_form",
   });
 
-  const { data: profile } = useQuery<Profile | null>({ queryKey: ['profile', session?.user?.id], /* ... */ });
-  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({ queryKey: ['bank_accounts', managementType], /* ... */ });
+  const { data: profile } = useQuery<Profile | null>({ queryKey: ['profile', session?.user?.id] });
+  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({ queryKey: ['bank_accounts', managementType] });
 
   const accountType = form.watch("account_type");
   const status = form.watch("status");
@@ -108,15 +108,40 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
   const selectedBank = bankAccounts.find(b => b.id === paymentBankId);
 
   useEffect(() => {
-    // Reset logic...
-  }, [account, form]);
+    if (account) {
+      form.reset({
+        ...account,
+        due_date: new Date(`${account.due_date}T00:00:00`),
+        payment_date: account.payment_date ? new Date(`${account.payment_date}T00:00:00`) : null,
+        total_value: account.account_type === 'parcelada' && account.installment_value ? account.installment_value : account.total_value,
+        recurrence_end_date: account.recurrence_end_date ? new Date(`${account.recurrence_end_date}T00:00:00`) : null,
+        recurrence_indefinite: !account.recurrence_end_date,
+        other_attachments_form: [],
+      });
+    } else {
+      form.reset({
+        name: "",
+        total_value: 0,
+        due_date: new Date(),
+        status: "pendente",
+        account_type: "unica",
+        installments_total: 2,
+        initial_installment: 1,
+        payment_date: null,
+        payment_method: undefined,
+        notes: "",
+        recurrence_indefinite: true,
+        generate_bill_proof: false,
+        other_attachments_form: [],
+      });
+    }
+  }, [account, form, isOpen]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!session?.user) return showError("Usuário não autenticado.");
     setIsSubmitting(true);
 
     try {
-      // 1. Upload all files and get URLs
       const bill_proof_url = values.bill_proof?.[0] ? await uploadFile(values.bill_proof[0], session.user.id) : account?.bill_proof_url || null;
       const payment_proof_url = values.payment_proof?.[0] ? await uploadFile(values.payment_proof[0], session.user.id) : account?.payment_proof_url || null;
       
@@ -128,24 +153,14 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         }
       }
 
-      // 2. Prepare data for PDFs
-      const basePdfData = {
-        ...values,
-        due_date: format(values.due_date, "yyyy-MM-dd"),
-        payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null,
-        bill_proof_url_original: bill_proof_url,
-        payment_proof_url_original: payment_proof_url,
-        other_attachments,
-      };
+      const basePdfData = { ...values, due_date: format(values.due_date, "yyyy-MM-dd"), payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null, bill_proof_url_original: bill_proof_url, payment_proof_url_original: payment_proof_url, other_attachments, };
 
-      // 3. Generate System Bill PDF if requested
       let system_generated_bill_url = account?.system_generated_bill_url || null;
       if (values.generate_bill_proof) {
         const pdfFile = await generateCustomBillPdf(basePdfData, bankAccounts, profile, last4Digits, values.pdf_options);
         system_generated_bill_url = await uploadFile(pdfFile, session.user.id);
       }
 
-      // 4. Generate Full Report PDF
       let relatedInstallments: Account[] = [];
       if (account?.group_id) {
         const { data } = await supabase.from('accounts').select('*').eq('group_id', account.group_id);
@@ -154,29 +169,13 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
       const reportPdfFile = await generateFullReportPdf(basePdfData, relatedInstallments);
       const full_report_url = await uploadFile(reportPdfFile, session.user.id);
 
-      // 5. Prepare final data for DB
-      const dbData = {
-        ...basePdfData,
-        bill_proof_url,
-        payment_proof_url,
-        other_attachments,
-        system_generated_bill_url,
-        full_report_url,
-        // remove form-only fields
-        bill_proof: undefined,
-        payment_proof: undefined,
-        other_attachments_form: undefined,
-        generate_bill_proof: undefined,
-        pdf_options: undefined,
-      };
+      const dbData = { ...values, due_date: format(values.due_date, "yyyy-MM-dd"), payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null, bill_proof_url, payment_proof_url, other_attachments, system_generated_bill_url, full_report_url, bill_proof: undefined, payment_proof: undefined, other_attachments_form: undefined, generate_bill_proof: undefined, pdf_options: undefined, };
       
-      // 6. Save to DB
       if (account) {
         const { error } = await supabase.from("accounts").update(dbData).eq("id", account.id);
         if (error) throw error;
         showSuccess("Conta atualizada com sucesso!");
       } else {
-        // Create logic for single/installment accounts...
         const { error } = await supabase.from("accounts").insert([{ ...dbData, user_id: session.user.id, management_type: managementType }]);
         if (error) throw error;
         showSuccess("Conta criada com sucesso!");
@@ -199,42 +198,29 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-[80vh] overflow-y-auto p-2">
-            {/* ... existing form fields ... */}
-            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Nome</FormLabel> <FormControl><Input placeholder="Ex: Compra de TV" {...field} /></FormControl> <FormMessage /> </FormItem> )} />
+              <FormField control={form.control} name="total_value" render={({ field }) => ( <FormItem> <FormLabel>Valor</FormLabel> <FormControl> <CurrencyInput placeholder="R$ 0,00" value={field.value || 0} onValueChange={field.onChange} /> </FormControl> <FormMessage /> </FormItem> )} />
+              <FormField control={form.control} name="due_date" render={({ field }) => ( <FormItem className="flex flex-col"> <FormLabel>Data de Vencimento</FormLabel> <Popover> <PopoverTrigger asChild> <FormControl> <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}> {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>} <CalendarIcon className="ml-auto h-4 w-4 opacity-50" /> </Button> </FormControl> </PopoverTrigger> <PopoverContent className="w-auto p-0" align="start"> <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /> </PopoverContent> </Popover> <FormMessage /> </FormItem> )} />
+              <FormField control={form.control} name="status" render={({ field }) => ( <FormItem> <FormLabel>Status</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl> <SelectContent> <SelectItem value="pendente">Pendente</SelectItem> <SelectItem value="pago">Pago</SelectItem> <SelectItem value="vencido">Vencido</SelectItem> </SelectContent> </Select> <FormMessage /> </FormItem> )} />
+              {status === 'vencido' && ( <FormField control={form.control} name="fees_and_fines" render={({ field }) => ( <FormItem> <FormLabel>Juros e Multas</FormLabel> <FormControl> <CurrencyInput placeholder="R$ 0,00" value={field.value || 0} onValueChange={field.onChange} /> </FormControl> <FormMessage /> </FormItem> )} /> )}
+              <FormField control={form.control} name="account_type" render={({ field }) => ( <FormItem> <FormLabel>Tipo de Conta</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!!account}> <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl> <SelectContent> <SelectItem value="unica">Única</SelectItem> <SelectItem value="parcelada">Parcelada</SelectItem> <SelectItem value="recorrente">Recorrente</SelectItem> </SelectContent> </Select> <FormMessage /> </FormItem> )} />
+              {accountType === 'parcelada' && !account && ( <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md"> <FormField control={form.control} name="installments_total" render={({ field }) => ( <FormItem> <FormLabel>Total de Parcelas</FormLabel> <FormControl><NumericInput {...field} min={2} max={999} /></FormControl> <FormMessage /> </FormItem> )} /> <FormField control={form.control} name="initial_installment" render={({ field }) => ( <FormItem> <FormLabel>Parcela Inicial</FormLabel> <FormControl><Input type="number" min="1" {...field} /></FormControl> <FormMessage /> </FormItem> )} /> <FormField control={form.control} name="is_total_value" render={({ field }) => ( <FormItem className="flex flex-row items-center space-x-2 pt-6 col-span-2"> <FormControl> <Checkbox checked={field.value} onCheckedChange={field.onChange} /> </FormControl> <FormLabel>O valor informado é o total da compra</FormLabel> </FormItem> )} /> </div> )}
+              {accountType === 'recorrente' && ( <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4 border p-4 rounded-md"> <FormField control={form.control} name="recurrence_end_date" render={({ field }) => ( <FormItem className="flex flex-col"> <FormLabel>Data Final</FormLabel> <Popover> <PopoverTrigger asChild> <FormControl> <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={form.watch('recurrence_indefinite')}> {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>} <CalendarIcon className="ml-auto h-4 w-4 opacity-50" /> </Button> </FormControl> </PopoverTrigger> <PopoverContent className="w-auto p-0" align="start"> <Calendar mode="single" selected={field.value} onSelect={field.onChange} /> </PopoverContent> </Popover> <FormMessage /> </FormItem> )} /> <FormField control={form.control} name="recurrence_indefinite" render={({ field }) => ( <FormItem className="flex flex-row items-center space-x-2 pt-6"> <FormControl> <Checkbox checked={field.value} onCheckedChange={field.onChange} /> </FormControl> <FormLabel>Sem data de término</FormLabel> </FormItem> )} /> </div> )}
+              {status === 'pago' && ( <> <FormField control={form.control} name="payment_date" render={({ field }) => ( <FormItem className="flex flex-col"> <FormLabel>Data de Pagamento</FormLabel> <Popover> <PopoverTrigger asChild> <FormControl> <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}> {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>} <CalendarIcon className="ml-auto h-4 w-4 opacity-50" /> </Button> </FormControl> </PopoverTrigger> <PopoverContent className="w-auto p-0" align="start"> <Calendar mode="single" selected={field.value} onSelect={field.onChange} /> </PopoverContent> </Popover> <FormMessage /> </FormItem> )} /> <FormField control={form.control} name="payment_method" render={({ field }) => ( <FormItem> <FormLabel>Modo de Pagamento</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}> <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl> <SelectContent> <SelectItem value="dinheiro">Dinheiro</SelectItem> <SelectItem value="pix">Pix</SelectItem> <SelectItem value="boleto">Boleto</SelectItem> <SelectItem value="transferencia">Transferência</SelectItem> <SelectItem value="cartao">Cartão</SelectItem> </SelectContent> </Select> <FormMessage /> </FormItem> )} /> {paymentMethod && paymentMethod !== 'dinheiro' && ( <FormField control={form.control} name="payment_bank_id" render={({ field }) => ( <FormItem> <FormLabel>Banco de Pagamento</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}> <FormControl><SelectTrigger><SelectValue placeholder="Selecione o banco..." /></SelectTrigger></FormControl> <SelectContent> {bankAccounts.map(bank => ( <SelectItem key={bank.id} value={bank.id}>{bank.account_name} - {bank.bank_name}</SelectItem> ))} </SelectContent> </Select> <FormMessage /> </FormItem> )} /> )} {selectedBank?.account_type === 'cartao_credito' && ( <FormItem> <FormLabel>Últimos 4 dígitos</FormLabel> <FormControl> <Input placeholder="1234" value={last4Digits} onChange={(e) => setLast4Digits(e.target.value)} /> </FormControl> </FormItem> )} <FormField control={form.control} name="payment_proof" render={({ field }) => ( <FormItem> <FormLabel>Comprovante de Pagamento</FormLabel> <FormControl><Input type="file" onChange={(e) => field.onChange(e.target.files)} /></FormControl> <FormMessage /> </FormItem> )} /> </> )}
+              <FormField control={form.control} name="bill_proof" render={({ field }) => ( <FormItem> <FormLabel>Fatura / Conta</FormLabel> <FormControl><Input type="file" onChange={(e) => field.onChange(e.target.files)} /></FormControl> <FormMessage /> </FormItem> )} />
+            </div>
+            <FormField control={form.control} name="notes" render={({ field }) => ( <FormItem> <FormLabel>Observações</FormLabel> <FormControl><Textarea placeholder="Qualquer detalhe adicional..." {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem> )} />
             <div className="col-span-1 md:col-span-2 space-y-2">
               <FormLabel>Outros Anexos</FormLabel>
-              {fields.map((field, index) => (
-                <div key={field.id} className="flex items-center gap-2 p-2 border rounded-md">
-                  <FormField control={form.control} name={`other_attachments_form.${index}.name`} render={({ field }) => (
-                    <Input {...field} placeholder="Nome do anexo" className="flex-grow" />
-                  )} />
-                  <FormField control={form.control} name={`other_attachments_form.${index}.file`} render={({ field }) => (
-                     <Input type="file" onChange={(e) => field.onChange(e.target.files)} className="flex-grow" />
-                  )} />
-                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
-                    <XCircle className="h-5 w-5 text-red-500" />
-                  </Button>
-                </div>
-              ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ name: '', file: new DataTransfer().files })}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Anexo
-              </Button>
+              {fields.map((field, index) => ( <div key={field.id} className="flex items-center gap-2 p-2 border rounded-md"> <FormField control={form.control} name={`other_attachments_form.${index}.name`} render={({ field }) => ( <Input {...field} placeholder="Nome do anexo" className="flex-grow" /> )} /> <FormField control={form.control} name={`other_attachments_form.${index}.file`} render={({ field }) => ( <Input type="file" onChange={(e) => field.onChange(e.target.files)} className="flex-grow" /> )} /> <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}> <XCircle className="h-5 w-5 text-red-500" /> </Button> </div> ))}
+              <Button type="button" variant="outline" size="sm" onClick={() => append({ name: '', file: new DataTransfer().files })}> <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Anexo </Button>
             </div>
-
-            <FormField control={form.control} name="generate_bill_proof" render={({ field }) => (
-              <FormItem className="flex flex-row items-center space-x-2 pt-2">
-                <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                <FormLabel>Gerar fatura/conta customizada em PDF</FormLabel>
-              </FormItem>
-            )} />
+            <FormField control={form.control} name="generate_bill_proof" render={({ field }) => ( <FormItem className="flex flex-row items-center space-x-2 pt-2"> <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl> <FormLabel>Gerar fatura/conta customizada em PDF</FormLabel> </FormItem> )} />
             {generateBillProof && <PdfOptionsForm />}
-
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Salvar
-              </Button>
+              <Button type="submit" disabled={isSubmitting}> {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Salvar </Button>
             </DialogFooter>
           </form>
         </Form>
