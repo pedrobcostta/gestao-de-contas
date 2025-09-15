@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -73,6 +74,9 @@ export function UserForm({ isOpen, setIsOpen }: UserFormProps) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Adicionar Novo Usuário</DialogTitle>
+          <DialogDescription>
+            Preencha os campos abaixo para criar uma nova conta de usuário.
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
