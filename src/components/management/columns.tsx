@@ -17,9 +17,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Account } from "@/types";
 import { formatCurrency } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
-import { showError, showSuccess } from "@/utils/toast";
 
 const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } = {
   pago: "default",
@@ -27,39 +24,7 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } 
   vencido: "destructive",
 };
 
-export const columns = ({ onView, onEdit }: { onView: (account: Account) => void; onEdit: (account: Account) => void; }): ColumnDef<Account>[] => {
-  const queryClient = useQueryClient();
-
-  const handleDelete = async (account: Account) => {
-    let error = null;
-    let successMessage = "";
-
-    if (account.group_id && account.account_type === 'parcelada') {
-      if (confirm("Esta é uma conta parcelada. Deseja deletar TODAS as parcelas relacionadas a esta compra?")) {
-        const { error: deleteError } = await supabase.from('accounts').delete().eq('group_id', account.group_id);
-        error = deleteError;
-        successMessage = "Todas as parcelas foram deletadas com sucesso!";
-      } else {
-        const { error: deleteError } = await supabase.from('accounts').delete().eq('id', account.id);
-        error = deleteError;
-        successMessage = "Apenas esta parcela foi deletada com sucesso!";
-      }
-    } else {
-      if (confirm(`Tem certeza que deseja deletar a conta "${account.name}"?`)) {
-        const { error: deleteError } = await supabase.from('accounts').delete().eq('id', account.id);
-        error = deleteError;
-        successMessage = "Conta deletada com sucesso!";
-      }
-    }
-
-    if (error) {
-      showError(`Erro ao deletar: ${error.message}`);
-    } else if (successMessage) {
-      showSuccess(successMessage);
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-    }
-  };
-
+export const columns = ({ onView, onEdit, onDelete }: { onView: (account: Account) => void; onEdit: (account: Account) => void; onDelete: (account: Account) => void; }): ColumnDef<Account>[] => {
   return [
     {
       accessorKey: "name",
@@ -144,7 +109,7 @@ export const columns = ({ onView, onEdit }: { onView: (account: Account) => void
                 Editar
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleDelete(account)} className="text-red-600">
+              <DropdownMenuItem onClick={() => onDelete(account)} className="text-red-600">
                 Deletar
               </DropdownMenuItem>
             </DropdownMenuContent>

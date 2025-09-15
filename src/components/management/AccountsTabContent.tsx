@@ -5,6 +5,7 @@ import {
   getExpandedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   Table,
@@ -24,6 +25,8 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
+import { showError, showSuccess } from "@/utils/toast";
 
 interface AccountsTabContentProps {
   data: (Account & { subRows?: Account[] })[];
@@ -33,6 +36,7 @@ interface AccountsTabContentProps {
 
 export function AccountsTabContent({ data, isLoading, managementType }: AccountsTabContentProps) {
   const isMobile = useIsMobile();
+  const queryClient = useQueryClient();
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [accountForDetails, setAccountForDetails] = useState<Account | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -53,9 +57,40 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
     setIsFormOpen(true);
   };
 
+  const handleDeleteAccount = async (account: Account) => {
+    let error = null;
+    let successMessage = "";
+
+    if (account.group_id && account.account_type === 'parcelada') {
+      if (confirm("Esta é uma conta parcelada. Deseja deletar TODAS as parcelas relacionadas a esta compra?")) {
+        const { error: deleteError } = await supabase.from('accounts').delete().eq('group_id', account.group_id);
+        error = deleteError;
+        successMessage = "Todas as parcelas foram deletadas com sucesso!";
+      } else {
+        const { error: deleteError } = await supabase.from('accounts').delete().eq('id', account.id);
+        error = deleteError;
+        successMessage = "Apenas esta parcela foi deletada com sucesso!";
+      }
+    } else {
+      if (confirm(`Tem certeza que deseja deletar a conta "${account.name}"?`)) {
+        const { error: deleteError } = await supabase.from('accounts').delete().eq('id', account.id);
+        error = deleteError;
+        successMessage = "Conta deletada com sucesso!";
+      }
+    }
+
+    if (error) {
+      showError(`Erro ao deletar: ${error.message}`);
+    } else if (successMessage) {
+      showSuccess(successMessage);
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    }
+  };
+
   const tableColumns = columns({
     onView: handleViewAccount,
     onEdit: handleEditAccount,
+    onDelete: handleDeleteAccount,
   });
 
   const table = useReactTable({
@@ -99,6 +134,7 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
             <CardFooter className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => handleViewAccount(account)}>Visualizar</Button>
               <Button size="sm" onClick={() => handleEditAccount(account)}>Editar</Button>
+              <Button variant="destructive" size="sm" onClick={() => handleDeleteAccount(account)}>Deletar</Button>
             </CardFooter>
           </Card>
         ))
