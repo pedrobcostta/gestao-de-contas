@@ -25,7 +25,7 @@ export const AccountTypeFields = ({ account }: AccountTypeFieldsProps) => {
       <FormField control={control} name="account_type" render={({ field }) => (
         <FormItem>
           <FormLabel>Tipo de Conta</FormLabel>
-          <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!!account}>
+          <Select onValueChange={field.onChange} defaultValue={field.value}>
             <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
             <SelectContent>
               <SelectItem value="unica">Única</SelectItem>
@@ -40,7 +40,7 @@ export const AccountTypeFields = ({ account }: AccountTypeFieldsProps) => {
         <FormField control={control} name="installments_total" render={({ field }) => (
           <FormItem>
             <FormLabel>Número de Parcelas</FormLabel>
-            <FormControl><Input type="number" {...field} disabled={!!account} value={field.value ?? ''} /></FormControl>
+            <FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl>
             <FormMessage />
           </FormItem>
         )} />
@@ -52,7 +52,7 @@ export const AccountTypeFields = ({ account }: AccountTypeFieldsProps) => {
             <Popover>
               <PopoverTrigger asChild>
                 <FormControl>
-                  <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={!!account}>
+                  <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
                     {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                   </Button>

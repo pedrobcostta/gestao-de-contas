@@ -13,7 +13,8 @@ const addHeader = (doc: jsPDF, title: string) => {
 };
 
 const addSection = (doc: jsPDF, title: string, body: (string | null)[][], startY: number): number => {
-  if (body.length === 0) return startY;
+  const filteredBody = body.filter(row => row[1] !== null && row[1] !== undefined && row[1] !== '');
+  if (filteredBody.length === 0) return startY;
   
   let finalY = startY;
   if (finalY + 20 > doc.internal.pageSize.height) {
@@ -28,7 +29,7 @@ const addSection = (doc: jsPDF, title: string, body: (string | null)[][], startY
     startY: finalY + 5,
     theme: 'striped',
     head: [['Descrição', 'Valor']],
-    body: body.filter(row => row[1]), // Filter out empty rows
+    body: filteredBody,
   });
 
   return (doc as any).lastAutoTable.finalY + 10;
@@ -69,6 +70,25 @@ const addAttachmentsToPdf = async (doc: jsPDF, attachments: CustomAttachment[], 
     }
   }
   return finalY;
+};
+
+const addSignatures = (doc: jsPDF, startY: number) => {
+  let y = startY + 20;
+  if (y > doc.internal.pageSize.getHeight() - 40) {
+    doc.addPage();
+    y = 40;
+  }
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const lineLength = 80;
+  const startXRemetente = (pageWidth / 4) - (lineLength / 2);
+  const startXDestinatario = (pageWidth * 3 / 4) - (lineLength / 2);
+
+  doc.line(startXRemetente, y, startXRemetente + lineLength, y);
+  doc.text("Remetente", startXRemetente + lineLength / 2, y + 5, { align: 'center' });
+
+  doc.line(startXDestinatario, y, startXDestinatario + lineLength, y);
+  doc.text("Destinatário", startXDestinatario + lineLength / 2, y + 5, { align: 'center' });
 };
 
 export const generateCustomBillPdf = async (
@@ -127,6 +147,8 @@ export const generateCustomBillPdf = async (
   if (options.include_attachments) {
     finalY = await addAttachmentsToPdf(doc, attachments, finalY);
   }
+
+  addSignatures(doc, finalY);
 
   const pdfBlob = doc.output('blob');
   return new File([pdfBlob], `fatura_${accountData.name.replace(/\s/g, '_')}.pdf`, { type: 'application/pdf' });

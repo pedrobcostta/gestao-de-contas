@@ -215,7 +215,7 @@ export function ConfigurationTabContent({ managementType }: ConfigurationTabCont
                 <FormItem><FormLabel>CPF</FormLabel><FormControl><Input {...field} value={field.value ? formatCPF(field.value) : ''} onChange={e => field.onChange(formatCPF(e.target.value))} maxLength={14} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="rg" render={({ field }) => (
-                <FormItem><FormLabel>RG</FormLabel><FormControl><Input {...field} value={field.value ? formatRG(field.value) : ''} onChange={e => field.onChange(formatRG(e.target.value))} maxLength={12} disabled={isRgNewModel} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>RG</FormLabel><FormControl><Input {...field} value={field.value ?? ''} readOnly={isRgNewModel} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="is_rg_new_model" render={({ field }) => (
                 <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 h-fit"><FormControl>
@@ -230,7 +230,15 @@ export function ConfigurationTabContent({ managementType }: ConfigurationTabCont
                       <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                     </Button>
                   </FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      initialFocus
+                      captionLayout="dropdown-buttons"
+                      fromYear={1920}
+                      toYear={new Date().getFullYear()}
+                    />
                   </PopoverContent></Popover><FormMessage />
                 </FormItem>
               )} />

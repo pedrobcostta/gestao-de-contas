@@ -33,17 +33,17 @@ const formSchema = z.object({
   })).optional(),
   generate_system_bill: z.boolean().default(false),
   pdf_options: z.object({
-    include_name: z.boolean().default(true),
-    include_total_value: z.boolean().default(true),
-    include_due_date: z.boolean().default(true),
-    include_status: z.boolean().default(true),
-    include_account_type: z.boolean().default(true),
-    include_installments: z.boolean().default(true),
-    include_payment_date: z.boolean().default(true),
-    include_payment_method: z.boolean().default(true),
+    include_name: z.boolean().default(false),
+    include_total_value: z.boolean().default(false),
+    include_due_date: z.boolean().default(false),
+    include_status: z.boolean().default(false),
+    include_account_type: z.boolean().default(false),
+    include_installments: z.boolean().default(false),
+    include_payment_date: z.boolean().default(false),
+    include_payment_method: z.boolean().default(false),
     include_payment_bank_details: z.boolean().default(false),
-    include_fees_and_fines: z.boolean().default(true),
-    include_notes: z.boolean().default(true),
+    include_fees_and_fines: z.boolean().default(false),
+    include_notes: z.boolean().default(false),
     include_attachments: z.boolean().default(false),
     include_profile_fields: z.object({
         full_name: z.boolean().default(false),
@@ -107,10 +107,10 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
       status: 'pendente',
       generate_system_bill: false,
       pdf_options: {
-        include_name: true, include_total_value: true, include_due_date: true, include_status: true,
-        include_account_type: true, include_installments: true, include_payment_date: true,
-        include_payment_method: true, include_payment_bank_details: false, include_fees_and_fines: true,
-        include_notes: true, include_attachments: false,
+        include_name: false, include_total_value: false, include_due_date: false, include_status: false,
+        include_account_type: false, include_installments: false, include_payment_date: false,
+        include_payment_method: false, include_payment_bank_details: false, include_fees_and_fines: false,
+        include_notes: false, include_attachments: false,
         include_profile_fields: { full_name: false, cpf: false, rg: false },
       },
     },
@@ -147,6 +147,14 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
     const toastId = showLoading("Salvando conta...");
 
     try {
+      // If editing, delete the old record(s) first to prevent duplicates and handle type changes.
+      if (account) {
+        const idToDelete = account.group_id || account.id;
+        const columnToDelete = account.group_id ? 'group_id' : 'id';
+        const { error: deleteError } = await supabase.from('accounts').delete().eq(columnToDelete, idToDelete);
+        if (deleteError) throw deleteError;
+      }
+
       const { bill_proof, payment_proof, other_attachments_files, generate_system_bill, pdf_options, ...dbData } = values;
       const paymentBank = bankAccounts.find(b => b.id === values.payment_bank_id);
 
@@ -188,45 +196,37 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
       
       const finalBaseAccountData = { ...baseAccountData, system_generated_bill_url: systemGeneratedBillUrl };
 
-      if (account) {
+      // Always use the creation logic. For edits, this re-creates the account(s) with the updated info.
+      const groupId = uuidv4();
+      if (values.account_type === 'parcelada' && values.installments_total) {
+        const newAccounts = [];
+        const installmentValue = values.total_value / values.installments_total;
+        for (let i = 1; i <= values.installments_total; i++) {
+          newAccounts.push({ ...finalBaseAccountData, name: `${values.name}`, due_date: format(addMonths(values.due_date, i - 1), "yyyy-MM-dd"), total_value: installmentValue, installment_current: i, installments_total: values.installments_total, installment_value: installmentValue, group_id: groupId });
+        }
+        const reportFile = await generateFullReportPdf({ ...finalBaseAccountData, total_value: values.total_value }, newAccounts, paymentBank || null);
+        const reportUrl = await uploadFile(reportFile, 'generated-reports');
+        newAccounts.forEach(acc => acc.full_report_url = reportUrl);
+        const { error } = await supabase.from("accounts").insert(newAccounts);
+        if (error) throw error;
+      } else if (values.account_type === 'recorrente' && values.recurrence_end_date) {
+        const newAccounts = [];
+        let currentDate = values.due_date;
+        while (currentDate <= values.recurrence_end_date) {
+          newAccounts.push({ ...finalBaseAccountData, due_date: format(currentDate, "yyyy-MM-dd"), group_id: groupId });
+          currentDate = addMonths(currentDate, 1);
+        }
+        const { error } = await supabase.from("accounts").insert(newAccounts);
+        if (error) throw error;
+      } else {
         const reportFile = await generateFullReportPdf(finalBaseAccountData, [], paymentBank || null);
         const reportUrl = await uploadFile(reportFile, 'generated-reports');
-        const dataToUpdate = { ...finalBaseAccountData, full_report_url: reportUrl };
-        const { error } = await supabase.from("accounts").update(dataToUpdate).eq("id", account.id);
+        const dataToInsert = { ...finalBaseAccountData, group_id: groupId, full_report_url: reportUrl };
+        const { error } = await supabase.from("accounts").insert([dataToInsert]);
         if (error) throw error;
-        showSuccess("Conta atualizada com sucesso!");
-      } else {
-        const groupId = uuidv4();
-        if (values.account_type === 'parcelada' && values.installments_total) {
-          const newAccounts = [];
-          const installmentValue = values.total_value / values.installments_total;
-          for (let i = 1; i <= values.installments_total; i++) {
-            newAccounts.push({ ...finalBaseAccountData, name: `${values.name}`, due_date: format(addMonths(values.due_date, i - 1), "yyyy-MM-dd"), total_value: installmentValue, installment_current: i, installments_total: values.installments_total, installment_value: installmentValue, group_id: groupId });
-          }
-          const reportFile = await generateFullReportPdf({ ...finalBaseAccountData, total_value: values.total_value }, newAccounts, paymentBank || null);
-          const reportUrl = await uploadFile(reportFile, 'generated-reports');
-          newAccounts.forEach(acc => acc.full_report_url = reportUrl);
-          const { error } = await supabase.from("accounts").insert(newAccounts);
-          if (error) throw error;
-        } else if (values.account_type === 'recorrente' && values.recurrence_end_date) {
-          const newAccounts = [];
-          let currentDate = values.due_date;
-          while (currentDate <= values.recurrence_end_date) {
-            newAccounts.push({ ...finalBaseAccountData, due_date: format(currentDate, "yyyy-MM-dd"), group_id: groupId });
-            currentDate = addMonths(currentDate, 1);
-          }
-          const { error } = await supabase.from("accounts").insert(newAccounts);
-          if (error) throw error;
-        } else {
-          const reportFile = await generateFullReportPdf(finalBaseAccountData, [], paymentBank || null);
-          const reportUrl = await uploadFile(reportFile, 'generated-reports');
-          const dataToInsert = { ...finalBaseAccountData, group_id: groupId, full_report_url: reportUrl };
-          const { error } = await supabase.from("accounts").insert([dataToInsert]);
-          if (error) throw error;
-        }
-        showSuccess("Conta(s) criada(s) com sucesso!");
       }
-
+      
+      showSuccess(account ? "Conta atualizada com sucesso!" : "Conta(s) criada(s) com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       setIsOpen(false);
     } catch (error: any) {
