@@ -19,6 +19,7 @@ const mainOptions = [
 const advancedOptions = [
   { id: "include_payment_bank_details", label: "Incluir Dados Bancários" },
   { id: "include_attachments", label: "Adicionar Anexos ao PDF" },
+  { id: "include_signatures", label: "Incluir Linhas de Assinatura" },
 ];
 
 const profileFields = [

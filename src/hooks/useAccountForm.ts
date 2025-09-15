@@ -45,6 +45,7 @@ const formSchema = z.object({
     include_fees_and_fines: z.boolean().default(false),
     include_notes: z.boolean().default(false),
     include_attachments: z.boolean().default(false),
+    include_signatures: z.boolean().default(false),
     include_profile_fields: z.object({
         full_name: z.boolean().default(false),
         cpf: z.boolean().default(false),
@@ -110,7 +111,7 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
         include_name: false, include_total_value: false, include_due_date: false, include_status: false,
         include_account_type: false, include_installments: false, include_payment_date: false,
         include_payment_method: false, include_payment_bank_details: false, include_fees_and_fines: false,
-        include_notes: false, include_attachments: false,
+        include_notes: false, include_attachments: false, include_signatures: false,
         include_profile_fields: { full_name: false, cpf: false, rg: false },
       },
     },

@@ -72,6 +72,28 @@ const addAttachmentsToPdf = async (doc: jsPDF, attachments: CustomAttachment[], 
   return finalY;
 };
 
+const addQrCode = async (doc: jsPDF, pixBrCode: string, startY: number): Promise<number> => {
+  let finalY = startY;
+  try {
+    const qrCodeDataUrl = await QRCode.toDataURL(pixBrCode);
+    const qrCodeSize = 50;
+
+    if (finalY + qrCodeSize + 15 > doc.internal.pageSize.height) {
+      doc.addPage();
+      finalY = 20;
+    }
+
+    doc.setFontSize(14);
+    doc.text("PIX Copia e Cola", 14, finalY);
+    doc.addImage(qrCodeDataUrl, 'PNG', 14, finalY + 5, qrCodeSize, qrCodeSize);
+    
+    return finalY + qrCodeSize + 15;
+  } catch (err) {
+    console.error("Failed to generate QR code", err);
+    return finalY;
+  }
+};
+
 const addSignatures = (doc: jsPDF, startY: number) => {
   let y = startY + 20;
   if (y > doc.internal.pageSize.getHeight() - 40) {
@@ -101,7 +123,6 @@ export const generateCustomBillPdf = async (
   const doc = new jsPDF();
   addHeader(doc, "Fatura / Conta");
 
-  // Section 1: Account Details
   const accountBody: (string | null)[][] = [];
   if (options.include_name) accountBody.push(["Nome da Conta", accountData.name]);
   if (options.include_total_value) accountBody.push(["Valor", formatCurrency(accountData.total_value)]);
@@ -114,7 +135,6 @@ export const generateCustomBillPdf = async (
   if (options.include_notes) accountBody.push(["Observações", accountData.notes]);
   let finalY = addSection(doc, "Detalhes da Conta", accountBody, 35);
 
-  // Section 2: Payment Details
   const paymentBody: (string | null)[][] = [];
   if (options.include_payment_date && accountData.payment_date) {
     paymentBody.push(["Data de Pagamento", format(accountData.payment_date, "dd/MM/yyyy", { locale: ptBR })]);
@@ -134,7 +154,6 @@ export const generateCustomBillPdf = async (
   }
   finalY = addSection(doc, "Detalhes de Pagamento", paymentBody, finalY);
 
-  // Section 3: Profile Details
   const profileBody: (string | null)[][] = [];
   if (profile && options.include_profile_fields) {
     if (options.include_profile_fields.full_name) profileBody.push(["Nome Completo", `${profile.first_name || ''} ${profile.last_name || ''}`.trim()]);
@@ -143,12 +162,17 @@ export const generateCustomBillPdf = async (
   }
   finalY = addSection(doc, "Dados do Perfil", profileBody, finalY);
 
-  // Section 4: Attachments
+  if (accountData.pix_br_code) {
+    finalY = await addQrCode(doc, accountData.pix_br_code, finalY);
+  }
+
   if (options.include_attachments) {
     finalY = await addAttachmentsToPdf(doc, attachments, finalY);
   }
 
-  addSignatures(doc, finalY);
+  if (options.include_signatures) {
+    addSignatures(doc, finalY);
+  }
 
   const pdfBlob = doc.output('blob');
   return new File([pdfBlob], `fatura_${accountData.name.replace(/\s/g, '_')}.pdf`, { type: 'application/pdf' });
@@ -197,6 +221,10 @@ export const generateFullReportPdf = async (
       ]),
     });
     finalY = (doc as any).lastAutoTable.finalY;
+  }
+
+  if (accountData.pix_br_code) {
+    finalY = await addQrCode(doc, accountData.pix_br_code, finalY + 10);
   }
 
   const allAttachments: CustomAttachment[] = [
