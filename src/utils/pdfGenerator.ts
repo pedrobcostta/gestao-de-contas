@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import QRCode from 'qrcode';
-import { Account, BankAccount } from "@/types";
+import { Account, BankAccount, Profile } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -24,7 +24,7 @@ export interface PdfOptions {
   include_recipient_signature?: boolean;
 }
 
-// Helper to add a row to the PDF body if the option is enabled
+// Helper to add a row to the PDF body if the option is enabled and value exists
 const addRow = (body: any[][], option: boolean | undefined, label: string, value: any) => {
   if (option && value) {
     body.push([label, value]);
@@ -34,6 +34,8 @@ const addRow = (body: any[][], option: boolean | undefined, label: string, value
 export const generateAccountPdf = async (
   accountData: Partial<Account> & { bill_proof_url_original?: string, payment_proof_url_original?: string },
   bankAccounts: BankAccount[],
+  profile: Profile | null,
+  last4Digits: string,
   options: PdfOptions
 ): Promise<File> => {
   const doc = new jsPDF();
@@ -58,9 +60,24 @@ export const generateAccountPdf = async (
   if (accountData.status === 'pago') {
     addRow(body, options.include_payment_date, "Data de Pagamento:", accountData.payment_date ? format(new Date(`${accountData.payment_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR }) : '-');
     addRow(body, options.include_payment_method, "Método de Pagamento:", accountData.payment_method);
+    
     if (options.include_payment_bank && accountData.payment_bank_id) {
         const bank = bankAccounts.find(b => b.id === accountData.payment_bank_id);
-        addRow(body, true, "Banco de Pagamento:", bank ? `${bank.account_name} - ${bank.bank_name}` : '-');
+        if (bank) {
+            if (bank.account_type === 'cartao_credito') {
+                addRow(body, true, "Instituição:", `${bank.account_name} - ${bank.bank_name}`);
+                if (last4Digits) {
+                    addRow(body, true, "Final do Cartão:", `**** **** **** ${last4Digits}`);
+                }
+            } else { // conta_corrente or poupanca
+                addRow(body, true, "Banco de Pagamento:", `${bank.account_name} - ${bank.bank_name}`);
+                addRow(body, true, "Agência:", bank.agency);
+                addRow(body, true, "Conta:", bank.account_number);
+                if (profile) {
+                    addRow(body, true, "Titular:", `${profile.first_name || ''} ${profile.last_name || ''}`.trim());
+                }
+            }
+        }
     }
   }
 
