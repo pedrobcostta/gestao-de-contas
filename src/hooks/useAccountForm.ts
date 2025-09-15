@@ -168,10 +168,10 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
         ...dbData
       } = values;
 
-      let billProofUrl = account?.bill_proof_url;
+      let billProofUrl = account?.bill_proof_url || null;
       if (bill_proof) billProofUrl = await uploadFile(bill_proof, 'attachments');
 
-      let paymentProofUrl = account?.payment_proof_url;
+      let paymentProofUrl = account?.payment_proof_url || null;
       if (payment_proof) paymentProofUrl = await uploadFile(payment_proof, 'attachments');
 
       const otherAttachments: CustomAttachment[] = account?.other_attachments || [];
@@ -193,7 +193,7 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
         other_attachments: otherAttachments,
       };
 
-      let systemGeneratedBillUrl = account?.system_generated_bill_url;
+      let systemGeneratedBillUrl = account?.system_generated_bill_url || null;
       if (generate_system_bill) {
         const pdfData = { ...baseAccountData, due_date: values.due_date, payment_date: values.payment_date, bill_proof_url_original: billProofUrl, payment_proof_url_original: paymentProofUrl };
         const file = await generateCustomBillPdf(pdfData, bankAccounts, profile, values.card_last_4_digits || '', pdf_options);

@@ -1,7 +1,6 @@
 import { useFormContext } from "react-hook-form";
 import { FormField, FormControl, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 
 export const AccountAttachments = () => {
   const { control, watch } = useFormContext();
@@ -32,13 +31,6 @@ export const AccountAttachments = () => {
           )} />
         )}
       </div>
-      <FormField control={control} name="notes" render={({ field }) => (
-        <FormItem>
-          <FormLabel>Observações</FormLabel>
-          <FormControl><Textarea {...field} value={field.value ?? ''} /></FormControl>
-          <FormMessage />
-        </FormItem>
-      )} />
     </div>
   );
 };

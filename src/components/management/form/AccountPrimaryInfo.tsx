@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { cn } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
 
 export const AccountPrimaryInfo = () => {
   const { control, watch } = useFormContext();
@@ -47,6 +48,13 @@ export const AccountPrimaryInfo = () => {
               <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
             </PopoverContent>
           </Popover>
+          <FormMessage />
+        </FormItem>
+      )} />
+      <FormField control={control} name="notes" render={({ field }) => (
+        <FormItem>
+          <FormLabel>Observações</FormLabel>
+          <FormControl><Textarea {...field} value={field.value ?? ''} /></FormControl>
           <FormMessage />
         </FormItem>
       )} />

@@ -12,7 +12,7 @@ import { Download, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const DetailItem = ({ label, value }: { label: string; value: React.ReactNode }) => {
-  if (!value) return null;
+  if (!value && value !== 0) return null;
   return (
     <div>
       <p className="text-sm font-medium text-gray-500">{label}</p>
@@ -73,10 +73,12 @@ export function AccountDetails({ isOpen, setIsOpen, account }: { isOpen: boolean
         </DialogHeader>
         
         <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className={`grid w-full ${account.account_type === 'parcelada' ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <TabsTrigger value="details">Detalhes</TabsTrigger>
             <TabsTrigger value="attachments">Anexos</TabsTrigger>
-            <TabsTrigger value="installments" disabled={account.account_type !== 'parcelada'}>Parcelas</TabsTrigger>
+            {account.account_type === 'parcelada' && (
+              <TabsTrigger value="installments">Parcelas</TabsTrigger>
+            )}
           </TabsList>
           
           <TabsContent value="details" className="mt-4 space-y-4">
@@ -84,10 +86,10 @@ export function AccountDetails({ isOpen, setIsOpen, account }: { isOpen: boolean
               <DetailItem label="Valor" value={formatCurrency(account.total_value)} />
               <DetailItem label="Vencimento" value={format(new Date(`${account.due_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })} />
               <DetailItem label="Status" value={<Badge>{account.status}</Badge>} />
-              {account.payment_date && <DetailItem label="Data de Pagamento" value={format(new Date(`${account.payment_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })} />}
-              {account.payment_method && <DetailItem label="Método de Pagamento" value={account.payment_method} />}
-              {paymentBank && <DetailItem label="Banco de Pagamento" value={`${paymentBank.account_name} - ${paymentBank.bank_name}`} />}
-              {account.fees_and_fines && <DetailItem label="Juros e Multas" value={formatCurrency(account.fees_and_fines)} />}
+              <DetailItem label="Data de Pagamento" value={account.payment_date ? format(new Date(`${account.payment_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR }) : null} />
+              <DetailItem label="Método de Pagamento" value={account.payment_method} />
+              <DetailItem label="Banco de Pagamento" value={paymentBank ? `${paymentBank.account_name} - ${paymentBank.bank_name}` : null} />
+              <DetailItem label="Juros e Multas" value={formatCurrency(account.fees_and_fines)} />
               {account.account_type === 'parcelada' && <DetailItem label="Parcela" value={`${account.installment_current}/${account.installments_total}`} />}
             </div>
             <DetailItem label="Observações" value={account.notes} />
@@ -109,30 +111,32 @@ export function AccountDetails({ isOpen, setIsOpen, account }: { isOpen: boolean
             </div>
           </TabsContent>
 
-          <TabsContent value="installments" className="mt-4">
-            {isLoadingInstallments ? <Loader2 className="mx-auto animate-spin" /> : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Parcela</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {installments.map(inst => (
-                    <TableRow key={inst.id}>
-                      <TableCell>{inst.installment_current}/{inst.installments_total}</TableCell>
-                      <TableCell>{format(new Date(`${inst.due_date}T00:00:00`), "dd/MM/yyyy")}</TableCell>
-                      <TableCell>{formatCurrency(inst.total_value)}</TableCell>
-                      <TableCell><Badge>{inst.status}</Badge></TableCell>
+          {account.account_type === 'parcelada' && (
+            <TabsContent value="installments" className="mt-4">
+              {isLoadingInstallments ? <Loader2 className="mx-auto animate-spin" /> : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Parcela</TableHead>
+                      <TableHead>Vencimento</TableHead>
+                      <TableHead>Valor</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </TabsContent>
+                  </TableHeader>
+                  <TableBody>
+                    {installments.map(inst => (
+                      <TableRow key={inst.id}>
+                        <TableCell>{inst.installment_current}/{inst.installments_total}</TableCell>
+                        <TableCell>{format(new Date(`${inst.due_date}T00:00:00`), "dd/MM/yyyy")}</TableCell>
+                        <TableCell>{formatCurrency(inst.total_value)}</TableCell>
+                        <TableCell><Badge>{inst.status}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       </DialogContent>
     </Dialog>

@@ -99,13 +99,15 @@ export const AccountPaymentInfo = ({ bankAccounts }: AccountPaymentInfoProps) =>
           )}
         </>
       )}
-      <FormField control={control} name="fees_and_fines" render={({ field }) => (
-        <FormItem>
-          <FormLabel>Juros e Multas</FormLabel>
-          <FormControl><CurrencyInput value={field.value || 0} onValueChange={field.onChange} /></FormControl>
-          <FormMessage />
-        </FormItem>
-      )} />
+      {status === 'vencido' && (
+        <FormField control={control} name="fees_and_fines" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Juros e Multas</FormLabel>
+            <FormControl><CurrencyInput value={field.value || 0} onValueChange={field.onChange} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+      )}
     </div>
   );
 };
