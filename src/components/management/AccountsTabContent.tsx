@@ -55,7 +55,7 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
     }),
     getCoreRowModel: getCoreRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
-    getRowCanExpand: row => !!row.original.subRows,
+    getRowCanExpand: row => "subRows" in row.original,
   });
 
   return (

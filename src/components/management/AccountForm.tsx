@@ -278,7 +278,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <FormField control={form.control} name={`other_attachments_form.${index}.file`} render={({ field: { onChange, ...rest } }) => (
+                  <FormField control={form.control} name={`other_attachments_form.${index}.file`} render={({ field: { value, onChange, ...rest } }) => (
                     <FormItem className="flex-grow">
                       <FormControl><Input type="file" onChange={(e) => onChange(e.target.files)} {...rest} /></FormControl>
                       <FormMessage />
