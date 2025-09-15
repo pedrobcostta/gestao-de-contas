@@ -43,6 +43,12 @@ export function UserForm({ isOpen, setIsOpen }: UserFormProps) {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    defaultValues: {
+      first_name: "",
+      last_name: "",
+      email: "",
+      password: "",
+    },
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
