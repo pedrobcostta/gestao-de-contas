@@ -23,15 +23,24 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
+import { Permission } from "@/types";
 
 const formSchema = z.object({
   first_name: z.string().min(1, "O nome é obrigatório."),
   last_name: z.string().min(1, "O sobrenome é obrigatório."),
   email: z.string().email("E-mail inválido."),
   password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres."),
+  permissions: z.array(z.any()).optional(),
 });
+
+const managements = ['pessoal', 'casa', 'pai', 'mae'];
+const tabs = ['contas', 'pix', 'bancos', 'pagas', 'relatorios', 'perfil', 'usuarios'];
+const actions = ['read', 'write', 'edit', 'delete'];
 
 interface UserFormProps {
   isOpen: boolean;
@@ -41,6 +50,7 @@ interface UserFormProps {
 export function UserForm({ isOpen, setIsOpen }: UserFormProps) {
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedManagement, setSelectedManagement] = useState(managements[0]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -49,8 +59,30 @@ export function UserForm({ isOpen, setIsOpen }: UserFormProps) {
       last_name: "",
       email: "",
       password: "",
+      permissions: [],
     },
   });
+
+  const permissions = form.watch('permissions', []);
+
+  const handlePermissionChange = (tab: string, action: string, checked: boolean) => {
+    const newPermissions = [...(permissions || [])];
+    const permIndex = newPermissions.findIndex(p => p.management_type === selectedManagement && p.tab === tab);
+
+    if (permIndex > -1) {
+      newPermissions[permIndex][`can_${action}`] = checked;
+    } else {
+      newPermissions.push({
+        management_type: selectedManagement,
+        tab,
+        can_read: action === 'read' ? checked : false,
+        can_write: action === 'write' ? checked : false,
+        can_edit: action === 'edit' ? checked : false,
+        can_delete: action === 'delete' ? checked : false,
+      });
+    }
+    form.setValue('permissions', newPermissions);
+  };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
@@ -71,43 +103,74 @@ export function UserForm({ isOpen, setIsOpen }: UserFormProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Adicionar Novo Usuário</DialogTitle>
           <DialogDescription>
-            Preencha os campos abaixo para criar uma nova conta de usuário.
+            Preencha os campos abaixo e defina as permissões para criar uma nova conta.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="first_name" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nome</FormLabel>
-                <FormControl><Input {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="last_name" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Sobrenome</FormLabel>
-                <FormControl><Input {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="email" render={({ field }) => (
-              <FormItem>
-                <FormLabel>E-mail</FormLabel>
-                <FormControl><Input type="email" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="password" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Senha</FormLabel>
-                <FormControl><Input type="password" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField control={form.control} name="first_name" render={({ field }) => (
+                <FormItem><FormLabel>Nome</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="last_name" render={({ field }) => (
+                <FormItem><FormLabel>Sobrenome</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="email" render={({ field }) => (
+                <FormItem><FormLabel>E-mail</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="password" render={({ field }) => (
+                <FormItem><FormLabel>Senha</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </div>
+
+            <div>
+              <h3 className="text-lg font-medium mb-2">Permissões</h3>
+              <Select value={selectedManagement} onValueChange={setSelectedManagement}>
+                <SelectTrigger className="w-[180px] mb-4">
+                  <SelectValue placeholder="Selecione a Gestão" />
+                </SelectTrigger>
+                <SelectContent>
+                  {managements.map(m => <SelectItem key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tab</TableHead>
+                      <TableHead className="text-center">Ler</TableHead>
+                      <TableHead className="text-center">Escrever</TableHead>
+                      <TableHead className="text-center">Editar</TableHead>
+                      <TableHead className="text-center">Deletar</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tabs.map(tab => {
+                      const currentPerm = permissions?.find((p: Permission) => p.management_type === selectedManagement && p.tab === tab);
+                      return (
+                        <TableRow key={tab}>
+                          <TableCell className="font-medium">{tab.charAt(0).toUpperCase() + tab.slice(1)}</TableCell>
+                          {actions.map(action => (
+                            <TableCell key={action} className="text-center">
+                              <Checkbox
+                                checked={currentPerm?.[`can_${action}`] || false}
+                                onCheckedChange={(checked) => handlePermissionChange(tab, action, !!checked)}
+                              />
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={isSubmitting}>

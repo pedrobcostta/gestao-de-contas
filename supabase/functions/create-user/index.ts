@@ -17,7 +17,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { email, password, first_name, last_name } = await req.json();
+    const { email, password, first_name, last_name, permissions } = await req.json();
 
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -34,6 +34,17 @@ serve(async (req) => {
         throw new Error("A senha deve ter no mínimo 6 caracteres.");
       }
       throw error;
+    }
+
+    if (permissions && permissions.length > 0) {
+        const permsToInsert = permissions.map((p: any) => ({ ...p, user_id: data.user.id }));
+        const { error: insertPermsError } = await supabaseAdmin
+          .from('user_permissions')
+          .insert(permsToInsert);
+        if (insertPermsError) {
+            await supabaseAdmin.auth.admin.deleteUser(data.user.id);
+            throw insertPermsError;
+        }
     }
 
     return new Response(JSON.stringify({ user: data.user }), {
