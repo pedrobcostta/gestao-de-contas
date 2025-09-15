@@ -41,6 +41,35 @@ const formSchema = z.object({
   key_value: z.string().min(1, "A chave PIX é obrigatória."),
   owner_name: z.string().min(1, "O nome do titular é obrigatório."),
   bank_name: z.string().min(1, "O nome do banco é obrigatório."),
+}).superRefine((data, ctx) => {
+  const { key_type, key_value } = data;
+  if (key_type === "email") {
+    const emailValidation = z.string().email("Formato de e-mail inválido.");
+    const result = emailValidation.safeParse(key_value);
+    if (!result.success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: result.error.issues[0].message,
+        path: ["key_value"],
+      });
+    }
+  } else if (key_type === "celular") {
+    if (!/^\d{10,11}$/.test(key_value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Formato de celular inválido. Use apenas números, com DDD (ex: 11999999999).",
+        path: ["key_value"],
+      });
+    }
+  } else if (key_type === "cpf_cnpj") {
+    if (!/^(\d{11}|\d{14})$/.test(key_value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Formato de CPF/CNPJ inválido. Use apenas números.",
+        path: ["key_value"],
+      });
+    }
+  }
 });
 
 interface PixFormProps {

@@ -26,7 +26,15 @@ serve(async (req) => {
       user_metadata: { first_name, last_name },
     });
 
-    if (error) throw error;
+    if (error) {
+      if (error.message.includes("User already registered")) {
+        throw new Error("Este e-mail já está cadastrado.");
+      }
+      if (error.message.includes("Password should be at least 6 characters")) {
+        throw new Error("A senha deve ter no mínimo 6 caracteres.");
+      }
+      throw error;
+    }
 
     return new Response(JSON.stringify({ user: data.user }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

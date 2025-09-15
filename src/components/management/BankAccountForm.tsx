@@ -41,8 +41,8 @@ const formSchema = z.object({
   agency: z.string().optional().nullable(),
   account_number: z.string().optional().nullable(),
   card_limit: z.coerce.number().optional().nullable(),
-  card_closing_day: z.coerce.number().optional().nullable(),
-  card_due_day: z.coerce.number().optional().nullable(),
+  card_closing_day: z.coerce.number().min(1, "O dia deve ser no mínimo 1.").max(31, "O dia deve ser no máximo 31.").optional().nullable(),
+  card_due_day: z.coerce.number().min(1, "O dia deve ser no mínimo 1.").max(31, "O dia deve ser no máximo 31.").optional().nullable(),
 });
 
 interface BankAccountFormProps {
