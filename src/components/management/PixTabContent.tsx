@@ -20,12 +20,23 @@ import { pixColumns } from "./pixColumns";
 import { supabase } from "@/integrations/supabase/client";
 import { PixForm } from "./PixForm";
 import { QRCodeModal } from "./QRCodeModal";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PixTabContentProps {
   managementType: PixKey["management_type"];
 }
 
+const keyTypeLabels: { [key: string]: string } = {
+  cpf_cnpj: "CPF/CNPJ",
+  celular: "Celular",
+  email: "E-mail",
+  aleatoria: "Aleatória",
+  br_code: "Copia e Cola",
+};
+
 export function PixTabContent({ managementType }: PixTabContentProps) {
+  const isMobile = useIsMobile();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPixKey, setSelectedPixKey] = useState<PixKey | null>(null);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
@@ -61,57 +72,98 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
     }
   };
 
+  const tableColumns = pixColumns({ onEdit: handleEdit, onViewQr: handleViewQr });
+
   const table = useReactTable({
     data: pixKeys,
-    columns: pixColumns({ onEdit: handleEdit, onViewQr: handleViewQr }),
+    columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
   });
+
+  const renderMobileView = () => (
+    <div className="space-y-4">
+      {isLoading ? (
+        <p className="text-center text-muted-foreground">Carregando...</p>
+      ) : pixKeys.length > 0 ? (
+        pixKeys.map(key => (
+          <Card key={key.id}>
+            <CardHeader>
+              <CardTitle className="text-lg">{key.owner_name}</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="font-semibold">Chave</p>
+                <p className="truncate">{key.key_value}</p>
+              </div>
+              <div>
+                <p className="font-semibold">Tipo</p>
+                <p>{keyTypeLabels[key.key_type]}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="font-semibold">Banco</p>
+                <p>{key.bank_name}</p>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-end">
+              <Button size="sm" onClick={() => handleEdit(key)}>Editar</Button>
+            </CardFooter>
+          </Card>
+        ))
+      ) : (
+        <p className="text-center text-muted-foreground py-8">Nenhuma chave PIX encontrada.</p>
+      )}
+    </div>
+  );
+
+  const renderDesktopView = () => (
+    <div className="rounded-md border overflow-x-auto">
+      <Table className="min-w-[700px]">
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id}>
+              {headerGroup.headers.map((header) => (
+                <TableHead key={header.id}>
+                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {isLoading ? (
+            <TableRow>
+              <TableCell colSpan={tableColumns.length} className="h-24 text-center">
+                Carregando...
+              </TableCell>
+            </TableRow>
+          ) : table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={tableColumns.length} className="h-24 text-center">
+                Nenhuma chave PIX encontrada.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
         <Button onClick={handleAdd}>Adicionar Chave PIX</Button>
       </div>
-      <div className="rounded-md border overflow-x-auto">
-        <Table className="min-w-[700px]">
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={pixColumns({ onEdit: handleEdit, onViewQr: handleViewQr }).length} className="h-24 text-center">
-                  Carregando...
-                </TableCell>
-              </TableRow>
-            ) : table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={pixColumns({ onEdit: handleEdit, onViewQr: handleViewQr }).length} className="h-24 text-center">
-                  Nenhuma chave PIX encontrada.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      {isMobile ? renderMobileView() : renderDesktopView()}
       <PixForm
         isOpen={isFormOpen}
         setIsOpen={setIsFormOpen}
