@@ -44,6 +44,8 @@ import { showError, showSuccess } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthProvider";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { NumericInput } from "@/components/ui/numeric-input";
+import { generateAccountPdf } from "@/utils/pdfGenerator";
+import { PdfOptionsForm } from "./PdfOptionsForm";
 
 const formSchema = z.object({
   name: z.string().min(1, "O nome é obrigatório."),
@@ -68,6 +70,25 @@ const formSchema = z.object({
   notes: z.string().optional().nullable(),
   bill_proof: z.instanceof(FileList).optional(),
   payment_proof: z.instanceof(FileList).optional(),
+
+  generate_bill_proof: z.boolean().default(false),
+  pdf_options: z.object({
+    include_name: z.boolean().default(true),
+    include_total_value: z.boolean().default(true),
+    include_due_date: z.boolean().default(true),
+    include_status: z.boolean().default(true),
+    include_account_type: z.boolean().default(true),
+    include_installments: z.boolean().default(true),
+    include_payment_date: z.boolean().default(true),
+    include_payment_method: z.boolean().default(true),
+    include_payment_bank: z.boolean().default(true),
+    include_fees_and_fines: z.boolean().default(true),
+    include_notes: z.boolean().default(true),
+    include_bill_proof: z.boolean().default(true),
+    include_payment_proof: z.boolean().default(true),
+    include_owner_signature: z.boolean().default(false),
+    include_recipient_signature: z.boolean().default(false),
+  }).optional(),
 }).refine(data => {
     if (data.account_type === 'parcelada' && !data.installments_total) {
         return false;
@@ -124,6 +145,24 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
       recurrence_indefinite: true,
       installments_total: 2,
       initial_installment: 1,
+      generate_bill_proof: false,
+      pdf_options: {
+        include_name: true,
+        include_total_value: true,
+        include_due_date: true,
+        include_status: true,
+        include_account_type: true,
+        include_installments: true,
+        include_payment_date: true,
+        include_payment_method: true,
+        include_payment_bank: true,
+        include_fees_and_fines: true,
+        include_notes: true,
+        include_bill_proof: true,
+        include_payment_proof: true,
+        include_owner_signature: false,
+        include_recipient_signature: false,
+      }
     },
   });
 
@@ -143,6 +182,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
   const accountType = form.watch("account_type");
   const status = form.watch("status");
   const paymentMethod = form.watch("payment_method");
+  const generateBillProof = form.watch("generate_bill_proof");
 
   useEffect(() => {
     if (account) {
@@ -167,6 +207,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         payment_method: undefined,
         notes: "",
         recurrence_indefinite: true,
+        generate_bill_proof: false,
       });
     }
   }, [account, form]);
@@ -176,14 +217,29 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
     setIsSubmitting(true);
 
     try {
-      let bill_proof_url = account?.bill_proof_url || null;
+      let original_bill_proof_url = account?.bill_proof_url || null;
       if (values.bill_proof && values.bill_proof.length > 0) {
-        bill_proof_url = await uploadFile(values.bill_proof[0], session.user.id);
+        original_bill_proof_url = await uploadFile(values.bill_proof[0], session.user.id);
       }
 
-      let payment_proof_url = account?.payment_proof_url || null;
+      let original_payment_proof_url = account?.payment_proof_url || null;
       if (values.payment_proof && values.payment_proof.length > 0) {
-        payment_proof_url = await uploadFile(values.payment_proof[0], session.user.id);
+        original_payment_proof_url = await uploadFile(values.payment_proof[0], session.user.id);
+      }
+
+      let final_bill_proof_url = original_bill_proof_url;
+
+      if (values.generate_bill_proof) {
+        const accountDataForPdf = {
+          ...values,
+          due_date: format(values.due_date, "yyyy-MM-dd"),
+          payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null,
+          bill_proof_url_original: original_bill_proof_url,
+          payment_proof_url_original: original_payment_proof_url,
+        };
+        
+        const pdfFile = await generateAccountPdf(accountDataForPdf, bankAccounts, values.pdf_options!);
+        final_bill_proof_url = await uploadFile(pdfFile, session.user.id);
       }
 
       const recurrence_end_date = values.account_type === 'recorrente' && !values.recurrence_indefinite ? format(values.recurrence_end_date!, "yyyy-MM-dd") : null;
@@ -197,8 +253,8 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
             payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null,
             total_value: values.total_value,
             installment_value: values.account_type === 'parcelada' ? values.total_value : null,
-            bill_proof_url,
-            payment_proof_url,
+            bill_proof_url: final_bill_proof_url,
+            payment_proof_url: original_payment_proof_url,
             recurrence_end_date,
             fees_and_fines: values.fees_and_fines,
           })
@@ -235,7 +291,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               status: 'pendente',
               notes: values.notes,
               group_id: groupId,
-              bill_proof_url,
+              bill_proof_url: final_bill_proof_url,
             };
           });
           const { error } = await supabase.from('accounts').insert(newAccounts);
@@ -249,8 +305,8 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
               payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null,
               user_id: session.user.id,
               management_type: managementType,
-              bill_proof_url,
-              payment_proof_url,
+              bill_proof_url: final_bill_proof_url,
+              payment_proof_url: original_payment_proof_url,
               recurrence_end_date,
               fees_and_fines: values.fees_and_fines,
             },
@@ -496,6 +552,19 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                 <FormMessage />
               </FormItem>
             )} />
+            <FormField
+              control={form.control}
+              name="generate_bill_proof"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-2 pt-2">
+                  <FormControl>
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                  <FormLabel>Gerar fatura/conta em PDF</FormLabel>
+                </FormItem>
+              )}
+            />
+            {generateBillProof && <PdfOptionsForm />}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={isSubmitting}>
