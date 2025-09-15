@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { PdfOptionsForm } from "./PdfOptionsForm";
 import { generateCustomBillPdf, generateFullReportPdf } from "@/utils/pdfGenerator";
+import { Checkbox } from "../ui/checkbox";
 
 const formSchema = z.object({
   name: z.string().min(1, "O nome da conta é obrigatório."),
@@ -42,6 +43,7 @@ const formSchema = z.object({
   bill_proof: z.instanceof(File).optional().nullable(),
   payment_proof: z.instanceof(File).optional().nullable(),
   other_attachments_files: z.array(z.instanceof(File)).optional(),
+  generate_system_bill: z.boolean().default(false),
   pdf_options: z.object({
     include_name: z.boolean().default(true),
     include_total_value: z.boolean().default(true),
@@ -114,6 +116,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
     defaultValues: {
       account_type: 'unica',
       status: 'pendente',
+      generate_system_bill: false,
       pdf_options: {
         include_name: true, include_total_value: true, include_due_date: true, include_status: true,
         include_account_type: true, include_installments: true, include_payment_date: true,
@@ -125,7 +128,9 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
   });
 
   const accountType = form.watch("account_type");
+  const status = form.watch("status");
   const paymentBankId = form.watch("payment_bank_id");
+  const generateSystemBill = form.watch("generate_system_bill");
   const selectedPaymentBank = bankAccounts.find(b => b.id === paymentBankId);
 
   useEffect(() => {
@@ -137,6 +142,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         recurrence_end_date: account.recurrence_end_date ? new Date(`${account.recurrence_end_date}T00:00:00`) : undefined,
         total_value: account.total_value || 0,
         fees_and_fines: account.fees_and_fines || undefined,
+        generate_system_bill: !!account.system_generated_bill_url,
       });
     } else {
       form.reset({
@@ -152,6 +158,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         payment_bank_id: null,
         fees_and_fines: undefined,
         notes: "",
+        generate_system_bill: false,
       });
     }
   }, [account, form, isOpen]);
@@ -174,19 +181,28 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
     const toastId = showLoading("Salvando conta...");
 
     try {
+      const {
+        bill_proof,
+        payment_proof,
+        other_attachments_files,
+        generate_system_bill,
+        pdf_options,
+        ...dbData
+      } = values;
+
       let billProofUrl = account?.bill_proof_url;
-      if (values.bill_proof) {
-        billProofUrl = await uploadFile(values.bill_proof, 'attachments');
+      if (bill_proof) {
+        billProofUrl = await uploadFile(bill_proof, 'attachments');
       }
 
       let paymentProofUrl = account?.payment_proof_url;
-      if (values.payment_proof) {
-        paymentProofUrl = await uploadFile(values.payment_proof, 'attachments');
+      if (payment_proof) {
+        paymentProofUrl = await uploadFile(payment_proof, 'attachments');
       }
 
       const otherAttachments: CustomAttachment[] = account?.other_attachments || [];
-      if (values.other_attachments_files) {
-        for (const file of values.other_attachments_files) {
+      if (other_attachments_files) {
+        for (const file of other_attachments_files) {
           const url = await uploadFile(file, 'attachments');
           if (url) {
             otherAttachments.push({ name: file.name, url });
@@ -195,7 +211,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
       }
 
       const baseAccountData = {
-        ...values,
+        ...dbData,
         user_id: session.user.id,
         management_type: managementType,
         due_date: format(values.due_date, "yyyy-MM-dd"),
@@ -205,20 +221,25 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
         other_attachments: otherAttachments,
       };
 
-      const pdfDataForGeneration = {
-        ...baseAccountData,
-        due_date: values.due_date,
-        payment_date: values.payment_date,
-        bill_proof_url_original: billProofUrl,
-        payment_proof_url_original: paymentProofUrl,
-      };
-      const systemGeneratedBillFile = await generateCustomBillPdf(pdfDataForGeneration, bankAccounts, profile, values.card_last_4_digits || '', values.pdf_options);
-      const systemGeneratedBillUrl = await uploadFile(systemGeneratedBillFile, 'generated-bills');
+      let systemGeneratedBillUrl = account?.system_generated_bill_url;
+      if (generate_system_bill) {
+        const pdfDataForGeneration = {
+          ...baseAccountData,
+          due_date: values.due_date,
+          payment_date: values.payment_date,
+          bill_proof_url_original: billProofUrl,
+          payment_proof_url_original: paymentProofUrl,
+        };
+        const systemGeneratedBillFile = await generateCustomBillPdf(pdfDataForGeneration, bankAccounts, profile, values.card_last_4_digits || '', pdf_options);
+        systemGeneratedBillUrl = await uploadFile(systemGeneratedBillFile, 'generated-bills');
+      } else {
+        systemGeneratedBillUrl = null;
+      }
       
       const finalBaseAccountData = { ...baseAccountData, system_generated_bill_url: systemGeneratedBillUrl };
 
       if (account) { // UPDATE
-        const { error } = await supabase.from("accounts").update({ ...finalBaseAccountData, id: undefined, user_id: undefined, management_type: undefined }).eq("id", account.id);
+        const { error } = await supabase.from("accounts").update(finalBaseAccountData).eq("id", account.id);
         if (error) throw error;
         
         const fullReportFile = await generateFullReportPdf(finalBaseAccountData, []);
@@ -397,61 +418,65 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                     <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="payment_date" render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Data de Pagamento</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                            {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="payment_method" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Método de Pagamento</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                        <SelectItem value="pix">PIX</SelectItem>
-                        <SelectItem value="boleto">Boleto</SelectItem>
-                        <SelectItem value="transferencia">Transferência</SelectItem>
-                        <SelectItem value="cartao">Cartão</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="payment_bank_id" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Conta/Cartão de Pagamento</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {bankAccounts.map(b => <SelectItem key={b.id} value={b.id}>{b.account_name} - {b.bank_name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                {selectedPaymentBank?.account_type === 'cartao_credito' && (
-                  <FormField control={form.control} name="card_last_4_digits" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Últimos 4 dígitos do cartão</FormLabel>
-                      <FormControl><Input {...field} maxLength={4} value={field.value ?? ''} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                {status === 'pago' && (
+                  <>
+                    <FormField control={form.control} name="payment_date" render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Data de Pagamento</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                                {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="payment_method" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Método de Pagamento</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                            <SelectItem value="pix">PIX</SelectItem>
+                            <SelectItem value="boleto">Boleto</SelectItem>
+                            <SelectItem value="transferencia">Transferência</SelectItem>
+                            <SelectItem value="cartao">Cartão</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="payment_bank_id" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Conta/Cartão de Pagamento</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            {bankAccounts.map(b => <SelectItem key={b.id} value={b.id}>{b.account_name} - {b.bank_name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    {selectedPaymentBank?.account_type === 'cartao_credito' && (
+                      <FormField control={form.control} name="card_last_4_digits" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Últimos 4 dígitos do cartão</FormLabel>
+                          <FormControl><Input {...field} maxLength={4} value={field.value ?? ''} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    )}
+                  </>
                 )}
                 <FormField control={form.control} name="fees_and_fines" render={({ field }) => (
                   <FormItem>
@@ -474,19 +499,42 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <FormField control={form.control} name="payment_proof" render={({ field: { onChange, ...props } }) => (
-                    <FormItem>
-                      <FormLabel>Comprovante de Pagamento</FormLabel>
-                      <FormControl>
-                        <Input type="file" {...props} onChange={(e) => onChange(e.target.files?.[0])} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                  {status === 'pago' && (
+                    <FormField control={form.control} name="payment_proof" render={({ field: { onChange, ...props } }) => (
+                      <FormItem>
+                        <FormLabel>Comprovante de Pagamento</FormLabel>
+                        <FormControl>
+                          <Input type="file" {...props} onChange={(e) => onChange(e.target.files?.[0])} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
                 </div>
               </div>
               {/* PDF Options */}
-              <PdfOptionsForm />
+              <div className="col-span-1 md:col-span-2 space-y-4">
+                <FormField
+                  control={form.control}
+                  name="generate_system_bill"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          Gerar Fatura/Conta em PDF
+                        </FormLabel>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+                {generateSystemBill && <PdfOptionsForm />}
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancelar</Button>
