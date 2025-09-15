@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DollarSign, CheckCircle, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Account } from "@/types";
+import { Account, Profile } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { AccountsTabContent } from "./AccountsTabContent";
 import { PixTabContent } from "./PixTabContent";
@@ -15,6 +15,7 @@ import { ReportsTabContent } from "./ReportsTabContent";
 import { ConfigurationTabContent } from "./ConfigurationTabContent";
 import { UsersTabContent } from "./UsersTabContent";
 import { startOfMonth, endOfMonth, format } from "date-fns";
+import { useAuth } from "@/contexts/AuthProvider";
 
 interface ManagementLayoutProps {
   title: string;
@@ -31,10 +32,31 @@ const months = [
 const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
 
 const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
+  const { session } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [statusFilter, setStatusFilter] = useState('todas');
   const [typeFilter, setTypeFilter] = useState('todas');
+
+  const { data: profile } = useQuery<Profile | null>({
+    queryKey: ['profile', session?.user?.id],
+    queryFn: async () => {
+      if (!session?.user?.id) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+      if (error) {
+        console.error("Error fetching profile role:", error);
+        return null;
+      }
+      return data;
+    },
+    enabled: !!session?.user?.id,
+  });
+
+  const isAdmin = profile?.role === 'admin';
 
   const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
   const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
@@ -163,7 +185,7 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
           <TabsTrigger value="bancos">Gestão de Bancos</TabsTrigger>
           <TabsTrigger value="pagas">Contas Pagas</TabsTrigger>
           <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
-          <TabsTrigger value="usuarios">Gestão de Usuários</TabsTrigger>
+          {isAdmin && <TabsTrigger value="usuarios">Gestão de Usuários</TabsTrigger>}
           <TabsTrigger value="config">Configuração</TabsTrigger>
         </TabsList>
         <TabsContent value="contas">
@@ -209,16 +231,18 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
         <TabsContent value="relatorios">
           <ReportsTabContent managementType={managementType} />
         </TabsContent>
-        <TabsContent value="usuarios">
-           <Card>
-            <CardHeader>
-              <CardTitle>Usuários</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <UsersTabContent />
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="usuarios">
+            <Card>
+              <CardHeader>
+                <CardTitle>Usuários</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <UsersTabContent />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
         <TabsContent value="config">
           <ConfigurationTabContent />
         </TabsContent>

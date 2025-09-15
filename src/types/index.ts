@@ -62,6 +62,7 @@ export interface Profile {
   first_name: string | null;
   last_name: string | null;
   updated_at: string;
+  role: 'admin' | 'user';
 }
 
 export interface User {
