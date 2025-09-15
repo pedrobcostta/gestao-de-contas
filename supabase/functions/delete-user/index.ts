@@ -37,6 +37,7 @@ serve(async (req) => {
       .from('profiles')
       .select('role')
       .eq('id', callingUser.id)
+      .limit(1)
       .single();
     if (profileError || profile.role !== 'admin') {
       return new Response(JSON.stringify({ error: 'Acesso negado: Requer permissão de administrador.' }), {

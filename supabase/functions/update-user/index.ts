@@ -16,6 +16,7 @@ async function isAdmin(supabaseAdmin: any, req: Request): Promise<boolean> {
       .from('profiles')
       .select('role')
       .eq('id', user.id)
+      .limit(1)
       .single();
     return !profileError && profile.role === 'admin';
 }
