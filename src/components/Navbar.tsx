@@ -3,23 +3,40 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu } from 'lucide-react';
+import { usePermissions } from '@/contexts/PermissionsProvider';
 
-const NavLinks = ({ isMobile = false }: { isMobile?: boolean }) => (
-  <div className={isMobile ? "flex flex-col space-y-4" : "flex items-center space-x-4"}>
-    <Button variant="outline" asChild>
-      <Link to="/pessoal">Pessoal</Link>
-    </Button>
-    <Button variant="outline" asChild>
-      <Link to="/casa">Casa</Link>
-    </Button>
-    <Button variant="outline" asChild>
-      <Link to="/pai">Pai</Link>
-    </Button>
-    <Button variant="outline" asChild>
-      <Link to="/mae">Mãe</Link>
-    </Button>
-  </div>
-);
+const NavLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
+  const { permissions } = usePermissions();
+
+  const canRead = (managementType: string) => {
+    return permissions.some(p => p.management_type === managementType && p.can_read);
+  };
+
+  return (
+    <div className={isMobile ? "flex flex-col space-y-4" : "flex items-center space-x-4"}>
+      {canRead('pessoal') && (
+        <Button variant="outline" asChild>
+          <Link to="/pessoal">Pessoal</Link>
+        </Button>
+      )}
+      {canRead('casa') && (
+        <Button variant="outline" asChild>
+          <Link to="/casa">Casa</Link>
+        </Button>
+      )}
+      {canRead('pai') && (
+        <Button variant="outline" asChild>
+          <Link to="/pai">Pai</Link>
+        </Button>
+      )}
+      {canRead('mae') && (
+        <Button variant="outline" asChild>
+          <Link to="/mae">Mãe</Link>
+        </Button>
+      )}
+    </div>
+  );
+};
 
 const Navbar = () => {
   const navigate = useNavigate();

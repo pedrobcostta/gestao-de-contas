@@ -38,8 +38,17 @@ serve(async (req) => {
         });
     }
 
-    const { userId, firstName, lastName, status, permissions } = await req.json();
+    const { userId, email, password, firstName, lastName, status, permissions } = await req.json();
     if (!userId) throw new Error("User ID is required");
+
+    const authUpdatePayload: { email?: string; password?: string } = {};
+    if (email) authUpdatePayload.email = email;
+    if (password) authUpdatePayload.password = password;
+
+    if (Object.keys(authUpdatePayload).length > 0) {
+        const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, authUpdatePayload);
+        if (authError) throw authError;
+    }
 
     const { error: profileError } = await supabaseAdmin
       .from('profiles')

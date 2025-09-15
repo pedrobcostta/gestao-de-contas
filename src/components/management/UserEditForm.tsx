@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
@@ -48,47 +48,85 @@ export function UserEditForm({ isOpen, setIsOpen, user }: UserEditFormProps) {
         firstName: data.profile.first_name,
         lastName: data.profile.last_name,
         status: data.profile.status,
+        email: user.email,
+        password: "",
         permissions: data.permissions,
       });
     }
-  }, [data, form]);
+  }, [data, user.email, form]);
 
   const permissions = form.watch('permissions', []);
 
-  const handlePermissionChange = (tab: string, action: string, checked: boolean) => {
-    const newPermissions = [...permissions];
-    const permIndex = newPermissions.findIndex(p => p.management_type === selectedManagement && p.tab === tab);
+  const updatePermissions = (newPermissions: Permission[]) => {
+    form.setValue('permissions', newPermissions.filter(p => p.can_read || p.can_write || p.can_edit || p.can_delete));
+  };
 
+  const handleSelectAll = (checked: boolean) => {
+    let newPermissions = [...(permissions || [])];
+    tabs.forEach(tab => {
+      const permIndex = newPermissions.findIndex(p => p.management_type === selectedManagement && p.tab === tab);
+      if (permIndex > -1) {
+        actions.forEach(action => { newPermissions[permIndex][`can_${action}`] = checked; });
+      } else if (checked) {
+        newPermissions.push({ management_type: selectedManagement, tab, can_read: true, can_write: true, can_edit: true, can_delete: true } as Permission);
+      }
+    });
+    updatePermissions(newPermissions);
+  };
+
+  const handleSelectRow = (tab: string, checked: boolean) => {
+    let newPermissions = [...(permissions || [])];
+    const permIndex = newPermissions.findIndex(p => p.management_type === selectedManagement && p.tab === tab);
+    if (permIndex > -1) {
+      actions.forEach(action => { newPermissions[permIndex][`can_${action}`] = checked; });
+    } else if (checked) {
+      newPermissions.push({ management_type: selectedManagement, tab, can_read: true, can_write: true, can_edit: true, can_delete: true } as Permission);
+    }
+    updatePermissions(newPermissions);
+  };
+
+  const handlePermissionChange = (tab: string, action: string, checked: boolean) => {
+    let newPermissions = [...(permissions || [])];
+    const permIndex = newPermissions.findIndex(p => p.management_type === selectedManagement && p.tab === tab);
     if (permIndex > -1) {
       newPermissions[permIndex][`can_${action}`] = checked;
-    } else {
+    } else if (checked) {
       newPermissions.push({
-        management_type: selectedManagement,
-        tab,
-        can_read: action === 'read' ? checked : false,
-        can_write: action === 'write' ? checked : false,
-        can_edit: action === 'edit' ? checked : false,
-        can_delete: action === 'delete' ? checked : false,
-      });
+        management_type: selectedManagement, tab,
+        can_read: action === 'read' && checked, can_write: action === 'write' && checked,
+        can_edit: action === 'edit' && checked, can_delete: action === 'delete' && checked,
+      } as Permission);
     }
-    form.setValue('permissions', newPermissions);
+    updatePermissions(newPermissions);
+  };
+
+  const areAllSelected = tabs.every(tab => {
+    const perm = permissions?.find(p => p.management_type === selectedManagement && p.tab === tab);
+    return perm && actions.every(action => perm[`can_${action}`]);
+  });
+
+  const isRowSelected = (tab: string) => {
+    const perm = permissions?.find(p => p.management_type === selectedManagement && p.tab === tab);
+    return perm && actions.every(action => perm[`can_${action}`]);
   };
 
   const onSubmit = async (values: any) => {
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.functions.invoke('update-user', {
-        body: {
-          userId: user.id,
-          firstName: values.firstName,
-          lastName: values.lastName,
-          status: values.status,
-          permissions: values.permissions,
-        },
-      });
+      const payload = {
+        userId: user.id,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        status: values.status,
+        email: values.email,
+        permissions: values.permissions,
+        password: values.password || undefined,
+      };
+      const { error } = await supabase.functions.invoke('update-user', { body: payload });
       if (error) throw error;
       showSuccess("Usuário atualizado com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ['userDetails', user.id] });
       setIsOpen(false);
     } catch (error: any) {
       showError(`Erro ao atualizar usuário: ${error.message}`);
@@ -107,16 +145,22 @@ export function UserEditForm({ isOpen, setIsOpen, user }: UserEditFormProps) {
         {isLoading ? <Loader2 className="mx-auto my-8 h-8 w-8 animate-spin" /> : (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField control={form.control} name="firstName" render={({ field }) => (
                   <FormItem><FormLabel>Nome</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="lastName" render={({ field }) => (
                   <FormItem><FormLabel>Sobrenome</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
+                <FormField control={form.control} name="email" render={({ field }) => (
+                  <FormItem><FormLabel>E-mail</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="password" render={({ field }) => (
+                  <FormItem><FormLabel>Nova Senha</FormLabel><FormControl><Input type="password" placeholder="Deixe em branco para não alterar" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
                 <FormField control={form.control} name="status" render={({ field }) => (
                   <FormItem><FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="active">Ativo</SelectItem>
@@ -142,7 +186,11 @@ export function UserEditForm({ isOpen, setIsOpen, user }: UserEditFormProps) {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Tab</TableHead>
+                        <TableHead className="w-[120px]">
+                          <div className="flex items-center gap-2">
+                            <Checkbox checked={areAllSelected} onCheckedChange={handleSelectAll} /> Tab
+                          </div>
+                        </TableHead>
                         <TableHead className="text-center">Ler</TableHead>
                         <TableHead className="text-center">Escrever</TableHead>
                         <TableHead className="text-center">Editar</TableHead>
@@ -151,10 +199,15 @@ export function UserEditForm({ isOpen, setIsOpen, user }: UserEditFormProps) {
                     </TableHeader>
                     <TableBody>
                       {tabs.map(tab => {
-                        const currentPerm = permissions.find((p: Permission) => p.management_type === selectedManagement && p.tab === tab);
+                        const currentPerm = permissions?.find((p: Permission) => p.management_type === selectedManagement && p.tab === tab);
                         return (
                           <TableRow key={tab}>
-                            <TableCell className="font-medium">{tab.charAt(0).toUpperCase() + tab.slice(1)}</TableCell>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Checkbox checked={isRowSelected(tab)} onCheckedChange={(checked) => handleSelectRow(tab, !!checked)} />
+                                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                              </div>
+                            </TableCell>
                             {actions.map(action => (
                               <TableCell key={action} className="text-center">
                                 <Checkbox

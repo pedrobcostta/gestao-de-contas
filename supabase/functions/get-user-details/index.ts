@@ -42,13 +42,16 @@ serve(async (req) => {
     const { userId } = await req.json();
     if (!userId) throw new Error("User ID is required");
 
-    const { data: profile, error: profileError } = await supabaseAdmin
+    const { data: profiles, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('first_name, last_name, status')
-      .eq('id', userId)
-      .limit(1)
-      .single();
+      .eq('id', userId);
+
     if (profileError) throw profileError;
+
+    const profile = profiles && profiles.length > 0 
+      ? profiles[0] 
+      : { first_name: null, last_name: null, status: 'inactive' };
 
     const { data: permissions, error: permsError } = await supabaseAdmin
       .from('user_permissions')
