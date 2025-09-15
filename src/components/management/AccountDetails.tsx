@@ -36,7 +36,17 @@ const AttachmentItem = ({ label, url }: { label: string; url: string | null | un
 };
 
 export function AccountDetails({ isOpen, setIsOpen, account }: { isOpen: boolean; setIsOpen: (isOpen: boolean) => void; account: Account | null; }) {
-  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({ queryKey: ['bank_accounts', account?.management_type], enabled: !!account });
+  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
+    queryKey: ['bank_accounts', account?.management_type],
+    queryFn: async () => {
+      if (!account?.management_type) return [];
+      const { data, error } = await supabase.from('bank_accounts').select('*').eq('management_type', account.management_type);
+      if (error) throw new Error(error.message);
+      return data || [];
+    },
+    enabled: !!account,
+  });
+
   const { data: installments = [], isLoading: isLoadingInstallments } = useQuery<Account[]>({
     queryKey: ['installments', account?.group_id],
     queryFn: async () => {

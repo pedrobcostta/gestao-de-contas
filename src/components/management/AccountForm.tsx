@@ -97,8 +97,26 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
     name: "other_attachments_form",
   });
 
-  const { data: profile } = useQuery<Profile | null>({ queryKey: ['profile', session?.user?.id] });
-  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({ queryKey: ['bank_accounts', managementType] });
+  const { data: profile } = useQuery<Profile | null>({
+    queryKey: ['profile', session?.user?.id],
+    queryFn: async () => {
+      if (!session?.user?.id) return null;
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+      if (error) { console.error("Error fetching profile:", error); return null; }
+      return data;
+    },
+    enabled: !!session?.user?.id,
+  });
+
+  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
+    queryKey: ['bank_accounts', managementType],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('bank_accounts').select('*').eq('management_type', managementType);
+      if (error) throw new Error(error.message);
+      return data || [];
+    },
+    enabled: !!managementType,
+  });
 
   const accountType = form.watch("account_type");
   const status = form.watch("status");
@@ -169,7 +187,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
       const reportPdfFile = await generateFullReportPdf(basePdfData, relatedInstallments);
       const full_report_url = await uploadFile(reportPdfFile, session.user.id);
 
-      const dbData = { ...values, due_date: format(values.due_date, "yyyy-MM-dd"), payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null, bill_proof_url, payment_proof_url, other_attachments, system_generated_bill_url, full_report_url, bill_proof: undefined, payment_proof: undefined, other_attachments_form: undefined, generate_bill_proof: undefined, pdf_options: undefined, };
+      const dbData = { name: values.name, total_value: values.total_value, due_date: format(values.due_date, "yyyy-MM-dd"), status: values.status, account_type: values.account_type, payment_date: values.payment_date ? format(values.payment_date, "yyyy-MM-dd") : null, payment_method: values.payment_method, payment_bank_id: values.payment_bank_id, fees_and_fines: values.fees_and_fines, notes: values.notes, bill_proof_url, payment_proof_url, other_attachments, system_generated_bill_url, full_report_url, recurrence_end_date: values.account_type === 'recorrente' && !values.recurrence_indefinite ? format(values.recurrence_end_date!, "yyyy-MM-dd") : null, installment_value: values.account_type === 'parcelada' ? values.total_value : null, };
       
       if (account) {
         const { error } = await supabase.from("accounts").update(dbData).eq("id", account.id);
