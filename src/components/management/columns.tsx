@@ -64,12 +64,22 @@ export const columns = ({ onView, onEdit }: { onView: (account: Account) => void
     {
       accessorKey: "name",
       header: "Nome",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          {row.original.account_type === 'recorrente' && <span title="Conta Recorrente"><Repeat className="h-4 w-4 text-muted-foreground" /></span>}
-          <span>{row.original.name}</span>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const account = row.original;
+        return (
+          <div className="flex items-center gap-2">
+            {account.account_type === 'recorrente' && <span title="Conta Recorrente"><Repeat className="h-4 w-4 text-muted-foreground" /></span>}
+            <div>
+              <span>{account.name}</span>
+              {account.account_type === 'parcelada' && (
+                <span className="text-xs text-muted-foreground block">
+                  Parcela {account.installment_current}/{account.installments_total}
+                </span>
+              )}
+            </div>
+          </div>
+        )
+      },
     },
     {
       accessorKey: "due_date",

@@ -255,9 +255,9 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
           for (let i = 1; i <= values.installments_total; i++) {
             newAccounts.push({
               ...finalBaseAccountData,
-              name: `${values.name} ${i}/${values.installments_total}`,
+              name: `${values.name}`,
               due_date: format(addMonths(values.due_date, i - 1), "yyyy-MM-dd"),
-              total_value: values.total_value,
+              total_value: installmentValue,
               installment_current: i,
               installments_total: values.installments_total,
               installment_value: installmentValue,
@@ -267,7 +267,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
           const { error } = await supabase.from("accounts").insert(newAccounts);
           if (error) throw error;
 
-          const fullReportFile = await generateFullReportPdf(finalBaseAccountData, newAccounts);
+          const fullReportFile = await generateFullReportPdf({ ...finalBaseAccountData, total_value: values.total_value }, newAccounts);
           const fullReportUrl = await uploadFile(fullReportFile, 'generated-reports');
           await supabase.from('accounts').update({ full_report_url: fullReportUrl }).eq('group_id', groupId);
 
@@ -326,14 +326,14 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
                 )} />
                 <FormField control={form.control} name="total_value" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Valor Total</FormLabel>
+                    <FormLabel>{accountType === 'parcelada' ? 'Valor Total da Compra' : 'Valor Total'}</FormLabel>
                     <FormControl><CurrencyInput value={field.value} onValueChange={field.onChange} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="due_date" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Data de Vencimento</FormLabel>
+                    <FormLabel>{accountType === 'parcelada' ? 'Data de Vencimento da 1ª Parcela' : 'Data de Vencimento'}</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
