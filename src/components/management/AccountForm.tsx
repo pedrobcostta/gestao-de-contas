@@ -215,7 +215,7 @@ export function AccountForm({ isOpen, setIsOpen, account, managementType }: Acco
             const currentInstallment = initialInstallment + i;
             const dueDate = new Date(values.due_date);
             dueDate.setMonth(dueDate.getMonth() + i);
-            const installmentData = { ...commonDbData, user_id: session.user.id, management_type: managementType, total_value: installmentValue, installment_value: installmentValue, due_date: format(dueDate, "yyyy-MM-dd"), installments_total: values.installments_total, installment_current: currentInstallment, group_id: groupId, name: `${values.name} ${currentInstallment}/${values.installments_total}`, bill_proof_url: i === 0 ? bill_proof_url : null, other_attachments: i === 0 ? other_attachments : null, system_generated_bill_url: i === 0 ? system_generated_bill_url : null };
+            const installmentData = { ...commonDbData, user_id: session.user.id, management_type: managementType, total_value: installmentValue, installment_value: installmentValue, due_date: format(dueDate, "yyyy-MM-dd"), installments_total: values.installments_total, installment_current: currentInstallment, group_id: groupId, name: `${values.name} ${currentInstallment}/${values.installments_total}`, bill_proof_url: i === 0 ? bill_proof_url : null, other_attachments: i === 0 ? other_attachments : [], system_generated_bill_url: i === 0 ? system_generated_bill_url : null };
             createdInstallments.push(installmentData);
           }
           
