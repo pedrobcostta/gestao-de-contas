@@ -16,7 +16,7 @@ const DetailItem = ({ label, value }: { label: string; value: React.ReactNode })
   return (
     <div>
       <p className="text-sm font-medium text-gray-500">{label}</p>
-      <p className="text-md">{value}</p>
+      <div className="text-md">{value}</div>
     </div>
   );
 };
