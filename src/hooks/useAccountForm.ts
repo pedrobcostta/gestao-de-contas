@@ -28,8 +28,8 @@ const formSchema = z.object({
   bill_proof: z.instanceof(File).optional().nullable(),
   payment_proof: z.instanceof(File).optional().nullable(),
   other_attachments_files: z.array(z.object({
-    name: z.string().min(1, "Nome é obrigatório"),
-    file: z.instanceof(File, { message: "Arquivo é obrigatório" }),
+    name: z.string().min(1, "O nome do anexo é obrigatório."),
+    file: z.instanceof(File, { message: "O arquivo é obrigatório." }).nullable(),
   })).optional(),
   generate_system_bill: z.boolean().default(false),
   pdf_options: z.object({
@@ -65,6 +65,14 @@ const formSchema = z.object({
 }, {
   message: "A data final da recorrência é obrigatória.",
   path: ["recurrence_end_date"],
+}).refine(data => {
+  if (data.other_attachments_files) {
+    return data.other_attachments_files.every(att => (att.name && att.file) || (!att.name && !att.file));
+  }
+  return true;
+}, {
+  message: "Cada anexo deve ter um nome e um arquivo.",
+  path: ["other_attachments_files"],
 });
 
 type UseAccountFormProps = {
@@ -180,8 +188,10 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
       const otherAttachments: CustomAttachment[] = account?.other_attachments || [];
       if (other_attachments_files) {
         for (const attachment of other_attachments_files) {
-          const url = await uploadFile(attachment.file, 'attachments');
-          if (url) otherAttachments.push({ name: attachment.name, url });
+          if (attachment.file) {
+            const url = await uploadFile(attachment.file, 'attachments');
+            if (url) otherAttachments.push({ name: attachment.name, url });
+          }
         }
       }
 
