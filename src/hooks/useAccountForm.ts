@@ -44,10 +44,12 @@ const formSchema = z.object({
     include_payment_bank_details: z.boolean().default(false),
     include_fees_and_fines: z.boolean().default(true),
     include_notes: z.boolean().default(true),
-    include_bill_proof: z.boolean().default(true),
-    include_payment_proof: z.boolean().default(true),
-    include_owner_signature: z.boolean().default(false),
-    include_recipient_signature: z.boolean().default(false),
+    include_attachments: z.boolean().default(false),
+    include_profile_fields: z.object({
+        full_name: z.boolean().default(false),
+        cpf: z.boolean().default(false),
+        rg: z.boolean().default(false),
+    }).default({}),
   }).default({}),
 }).refine(data => {
   if (data.account_type === 'parcelada') {
@@ -65,14 +67,6 @@ const formSchema = z.object({
 }, {
   message: "A data final da recorrência é obrigatória.",
   path: ["recurrence_end_date"],
-}).refine(data => {
-  if (data.other_attachments_files) {
-    return data.other_attachments_files.every(att => (att.name && att.file) || (!att.name && !att.file));
-  }
-  return true;
-}, {
-  message: "Cada anexo deve ter um nome e um arquivo.",
-  path: ["other_attachments_files"],
 });
 
 type UseAccountFormProps = {
@@ -96,11 +90,11 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
   });
 
   const { data: profile } = useQuery<Profile | null>({
-    queryKey: ['profile', session?.user?.id],
+    queryKey: ['profile', session?.user?.id, managementType],
     queryFn: async () => {
       if (!session?.user?.id) return null;
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-      if (error) { console.error(error); return null; }
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).eq('management_type', managementType).single();
+      if (error && error.code !== 'PGRST116') { console.error(error); return null; }
       return data;
     },
     enabled: !!session?.user?.id,
@@ -116,8 +110,8 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
         include_name: true, include_total_value: true, include_due_date: true, include_status: true,
         include_account_type: true, include_installments: true, include_payment_date: true,
         include_payment_method: true, include_payment_bank_details: false, include_fees_and_fines: true,
-        include_notes: true, include_bill_proof: true, include_payment_proof: true,
-        include_owner_signature: false, include_recipient_signature: false,
+        include_notes: true, include_attachments: false,
+        include_profile_fields: { full_name: false, cpf: false, rg: false },
       },
     },
   });
@@ -134,33 +128,15 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
         generate_system_bill: !!account.system_generated_bill_url,
       });
     } else {
-      form.reset({
-        name: "",
-        total_value: 0,
-        due_date: new Date(),
-        account_type: 'unica',
-        status: 'pendente',
-        installments_total: undefined,
-        recurrence_end_date: undefined,
-        payment_date: null,
-        payment_method: null,
-        payment_bank_id: null,
-        fees_and_fines: undefined,
-        notes: "",
-        generate_system_bill: false,
-      });
+      form.reset();
     }
   }, [account, form]);
 
   const uploadFile = async (file: File, bucket: string): Promise<string> => {
-    if (!session?.user || !file) {
-      throw new Error("Usuário ou arquivo inválido para upload.");
-    }
-    const filePath = `${session.user.id}/${uuidv4()}-${file.name}`;
+    if (!session?.user || !file) throw new Error("Usuário ou arquivo inválido para upload.");
+    const filePath = `${session.user.id}/${managementType}/${uuidv4()}-${file.name}`;
     const { error } = await supabase.storage.from(bucket).upload(filePath, file);
-    if (error) {
-      throw new Error(`Erro no upload do arquivo: ${error.message}`);
-    }
+    if (error) throw new Error(`Erro no upload do arquivo: ${error.message}`);
     const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
     return data.publicUrl;
   };
@@ -171,15 +147,7 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
     const toastId = showLoading("Salvando conta...");
 
     try {
-      const {
-        bill_proof,
-        payment_proof,
-        other_attachments_files,
-        generate_system_bill,
-        pdf_options,
-        ...dbData
-      } = values;
-
+      const { bill_proof, payment_proof, other_attachments_files, generate_system_bill, pdf_options, ...dbData } = values;
       const paymentBank = bankAccounts.find(b => b.id === values.payment_bank_id);
 
       let billProofUrl = account?.bill_proof_url || null;
@@ -211,8 +179,8 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
 
       let systemGeneratedBillUrl = account?.system_generated_bill_url || null;
       if (generate_system_bill) {
-        const pdfData = { ...baseAccountData, due_date: values.due_date, payment_date: values.payment_date, bill_proof_url_original: billProofUrl, payment_proof_url_original: paymentProofUrl };
-        const file = await generateCustomBillPdf(pdfData, paymentBank || null, profile, pdf_options);
+        const pdfData = { ...baseAccountData, due_date: values.due_date, payment_date: values.payment_date };
+        const file = await generateCustomBillPdf(pdfData, paymentBank || null, profile, pdf_options, otherAttachments);
         systemGeneratedBillUrl = await uploadFile(file, 'generated-bills');
       } else if (account?.system_generated_bill_url) {
         systemGeneratedBillUrl = null;
@@ -224,7 +192,6 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
         const reportFile = await generateFullReportPdf(finalBaseAccountData, [], paymentBank || null);
         const reportUrl = await uploadFile(reportFile, 'generated-reports');
         const dataToUpdate = { ...finalBaseAccountData, full_report_url: reportUrl };
-
         const { error } = await supabase.from("accounts").update(dataToUpdate).eq("id", account.id);
         if (error) throw error;
         showSuccess("Conta atualizada com sucesso!");

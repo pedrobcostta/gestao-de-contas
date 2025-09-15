@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge";
 import { BankAccount } from "@/types";
-import { formatCurrency } from "@/lib/utils"
 
 const accountTypeLabels: { [key: string]: string } = {
   conta_corrente: "Conta Corrente",
@@ -40,9 +39,8 @@ export const bankAccountsColumns = ({ onEdit, onDelete }: { onEdit: (bankAccount
       ),
     },
     {
-      accessorKey: "card_limit",
-      header: "Limite",
-      cell: ({ row }) => row.original.account_type === 'cartao_credito' ? formatCurrency(row.original.card_limit) : 'N/A',
+      accessorKey: "owner_name",
+      header: "Titular",
     },
     {
       id: "actions",

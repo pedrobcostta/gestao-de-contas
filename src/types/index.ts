@@ -62,6 +62,7 @@ export interface BankAccount {
 
 export interface Profile {
   id: string;
+  management_type: "pessoal" | "casa" | "pai" | "mae";
   first_name: string | null;
   last_name: string | null;
   updated_at: string;
@@ -69,7 +70,14 @@ export interface Profile {
   cpf: string | null;
   rg: string | null;
   birth_date: string | null;
-  address: string | null;
+  address: string | null; // This can be deprecated or used as a fallback
+  cep: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  estado: string | null;
   birth_certificate_url: string | null;
   identity_document_front_url: string | null;
   identity_document_back_url: string | null;

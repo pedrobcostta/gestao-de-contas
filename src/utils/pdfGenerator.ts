@@ -1,39 +1,19 @@
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import QRCode from 'qrcode';
-import { Account, BankAccount, Profile } from "@/types";
+import { Account, BankAccount, Profile, CustomAttachment } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-const getLogoBase64 = async (): Promise<string> => {
-  try {
-    const response = await fetch('/logo-jpc-transparente.png');
-    if (!response.ok) return '';
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.error("Error fetching logo:", error);
-    return '';
-  }
-};
-
-const addHeader = (doc: jsPDF, title: string, logoBase64: string) => {
-  if (logoBase64) {
-    doc.addImage(logoBase64, 'PNG', 14, 10, 40, 15);
-  }
+const addHeader = (doc: jsPDF, title: string) => {
   doc.setFontSize(18);
   doc.text(title, doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
-  doc.line(14, 30, doc.internal.pageSize.getWidth() - 14, 30);
+  doc.line(14, 25, doc.internal.pageSize.getWidth() - 14, 25);
 };
 
-const addBankDetails = (doc: jsPDF, paymentBank: BankAccount, startY: number): number => {
-  if (!paymentBank) return startY;
+const addSection = (doc: jsPDF, title: string, body: (string | null)[][], startY: number): number => {
+  if (body.length === 0) return startY;
   
   let finalY = startY;
   if (finalY + 20 > doc.internal.pageSize.height) {
@@ -41,144 +21,152 @@ const addBankDetails = (doc: jsPDF, paymentBank: BankAccount, startY: number): n
     finalY = 20;
   }
 
-  doc.setFontSize(12);
-  doc.text("Detalhes do Pagamento", 14, finalY);
+  doc.setFontSize(14);
+  doc.text(title, 14, finalY);
   
-  const body = [
-    ['Banco', paymentBank.bank_name],
-    ['Titular', paymentBank.owner_name],
-    ['CPF', paymentBank.owner_cpf],
-  ];
-  if (paymentBank.account_type !== 'cartao_credito') {
-    body.push(['Agência', paymentBank.agency || 'N/A']);
-    body.push(['Conta', paymentBank.account_number || 'N/A']);
-  } else {
-    body.push(['Final do Cartão', paymentBank.card_last_4_digits || 'N/A']);
-  }
-
   autoTable(doc, {
     startY: finalY + 5,
     theme: 'striped',
     head: [['Descrição', 'Valor']],
-    body: body.map(row => [row[0], row[1] || '']),
+    body: body.filter(row => row[1]), // Filter out empty rows
   });
 
   return (doc as any).lastAutoTable.finalY + 10;
 };
 
-const addRow = (body: (string | undefined)[][], label: string, value: any, option: boolean) => {
-  if (option && value) {
-    body.push([label, String(value)]);
+const addAttachmentsToPdf = async (doc: jsPDF, attachments: CustomAttachment[], startY: number): Promise<number> => {
+  let finalY = startY;
+  if (attachments.length === 0) return finalY;
+
+  if (finalY + 20 > doc.internal.pageSize.height) { doc.addPage(); finalY = 20; }
+  doc.setFontSize(14);
+  doc.text("Anexos", 14, finalY);
+  finalY += 10;
+
+  for (const attachment of attachments) {
+    try {
+      // This assumes attachments are images. For other file types, this would need adjustment.
+      const response = await fetch(attachment.url);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>(resolve => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+
+      const imgProps = doc.getImageProperties(dataUrl);
+      const imgWidth = 180;
+      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
+      if (finalY + imgHeight + 15 > doc.internal.pageSize.height) { doc.addPage(); finalY = 20; }
+      
+      doc.setFontSize(10);
+      doc.text(`Anexo: ${attachment.name}`, 14, finalY);
+      doc.addImage(dataUrl, 'JPEG', 14, finalY + 5, imgWidth, imgHeight);
+      finalY += imgHeight + 15;
+    } catch (e) {
+      console.error(`Erro ao adicionar anexo ${attachment.name} ao PDF:`, e);
+    }
   }
+  return finalY;
 };
 
 export const generateCustomBillPdf = async (
-  accountData: any, paymentBank: BankAccount | null, profile: Profile | null, options: any
+  accountData: any, 
+  paymentBank: BankAccount | null, 
+  profile: Profile | null, 
+  options: any,
+  attachments: CustomAttachment[]
 ): Promise<File> => {
   const doc = new jsPDF();
-  const logoBase64 = await getLogoBase64();
-  addHeader(doc, "Fatura / Conta", logoBase64);
+  addHeader(doc, "Fatura / Conta");
 
-  if (profile?.first_name) {
-    doc.setFontSize(10);
-    doc.text(`Gerado por: ${profile.first_name} ${profile.last_name || ''}`, 14, 38);
+  // Section 1: Account Details
+  const accountBody: (string | null)[][] = [];
+  if (options.include_name) accountBody.push(["Nome da Conta", accountData.name]);
+  if (options.include_total_value) accountBody.push(["Valor", formatCurrency(accountData.total_value)]);
+  if (options.include_due_date) accountBody.push(["Vencimento", format(accountData.due_date, "dd/MM/yyyy", { locale: ptBR })]);
+  if (options.include_status) accountBody.push(["Status", accountData.status]);
+  if (options.include_account_type) accountBody.push(["Tipo", accountData.account_type]);
+  if (accountData.account_type === 'parcelada' && options.include_installments) {
+    accountBody.push(["Parcela", `${accountData.installment_current}/${accountData.installments_total}`]);
   }
+  if (options.include_notes) accountBody.push(["Observações", accountData.notes]);
+  let finalY = addSection(doc, "Detalhes da Conta", accountBody, 35);
 
-  const body: (string | undefined)[][] = [];
-  addRow(body, "Nome da Conta", accountData.name, options.include_name);
-  addRow(body, "Valor", formatCurrency(accountData.total_value), options.include_total_value);
-  addRow(body, "Data de Vencimento", format(accountData.due_date, "dd/MM/yyyy", { locale: ptBR }), options.include_due_date);
-  addRow(body, "Status", accountData.status, options.include_status);
-  addRow(body, "Tipo de Conta", accountData.account_type, options.include_account_type);
-  if (accountData.account_type === 'parcelada') {
-    addRow(body, "Parcela", `${accountData.installment_current}/${accountData.installments_total}`, options.include_installments);
+  // Section 2: Payment Details
+  const paymentBody: (string | null)[][] = [];
+  if (options.include_payment_date && accountData.payment_date) {
+    paymentBody.push(["Data de Pagamento", format(accountData.payment_date, "dd/MM/yyyy", { locale: ptBR })]);
   }
-  addRow(body, "Data de Pagamento", accountData.payment_date ? format(accountData.payment_date, "dd/MM/yyyy", { locale: ptBR }) : undefined, options.include_payment_date);
-  addRow(body, "Método de Pagamento", accountData.payment_method, options.include_payment_method);
-  addRow(body, "Juros e Multas", formatCurrency(accountData.fees_and_fines), options.include_fees_and_fines);
-  addRow(body, "Observações", accountData.notes, options.include_notes);
-
-  autoTable(doc, {
-    startY: 45,
-    head: [['Descrição', 'Detalhe']],
-    body: body,
-  });
-
-  let finalY = (doc as any).lastAutoTable.finalY + 10;
-
+  if (options.include_payment_method) paymentBody.push(["Método", accountData.payment_method]);
+  if (options.include_fees_and_fines) paymentBody.push(["Juros/Multas", formatCurrency(accountData.fees_and_fines)]);
   if (options.include_payment_bank_details && paymentBank) {
-    finalY = addBankDetails(doc, paymentBank, finalY);
+    paymentBody.push(["Banco", paymentBank.bank_name]);
+    paymentBody.push(["Titular", paymentBank.owner_name]);
+    paymentBody.push(["CPF", paymentBank.owner_cpf]);
+    if (paymentBank.account_type !== 'cartao_credito') {
+      paymentBody.push(['Agência', paymentBank.agency]);
+      paymentBody.push(['Conta', paymentBank.account_number]);
+    } else {
+      paymentBody.push(['Final do Cartão', paymentBank.card_last_4_digits]);
+    }
   }
+  finalY = addSection(doc, "Detalhes de Pagamento", paymentBody, finalY);
 
-  const addQrCode = async (label: string, url: string | null | undefined, option: boolean) => {
-    if (option && url) {
-      try {
-        const qrCodeImage = await QRCode.toDataURL(url);
-        if (finalY + 40 > doc.internal.pageSize.height) { doc.addPage(); finalY = 20; }
-        doc.setFontSize(10);
-        doc.text(label, 14, finalY);
-        doc.addImage(qrCodeImage, 'PNG', 14, finalY + 2, 30, 30);
-        finalY += 40;
-      } catch (err) { console.error("Failed to generate QR code", err); }
-    }
-  };
+  // Section 3: Profile Details
+  const profileBody: (string | null)[][] = [];
+  if (profile && options.include_profile_fields) {
+    if (options.include_profile_fields.full_name) profileBody.push(["Nome Completo", `${profile.first_name || ''} ${profile.last_name || ''}`.trim()]);
+    if (options.include_profile_fields.cpf) profileBody.push(["CPF", profile.cpf]);
+    if (options.include_profile_fields.rg) profileBody.push(["RG", profile.rg]);
+  }
+  finalY = addSection(doc, "Dados do Perfil", profileBody, finalY);
 
-  await addQrCode("QR Code - Fatura/Conta", accountData.bill_proof_url_original, options.include_bill_proof);
-  await addQrCode("QR Code - Comprovante", accountData.payment_proof_url_original, options.include_payment_proof);
-
-  if (options.include_owner_signature || options.include_recipient_signature) {
-    if (finalY + 20 > doc.internal.pageSize.height) { doc.addPage(); finalY = 20; }
-    if (options.include_owner_signature) {
-      doc.text("________________________", 14, finalY + 10);
-      doc.text("Assinatura do Proprietário", 15, finalY + 15);
-    }
-    if (options.include_recipient_signature) {
-      doc.text("________________________", 110, finalY + 10);
-      doc.text("Assinatura do Destinatário", 111, finalY + 15);
-    }
+  // Section 4: Attachments
+  if (options.include_attachments) {
+    finalY = await addAttachmentsToPdf(doc, attachments, finalY);
   }
 
   const pdfBlob = doc.output('blob');
-  return new File([pdfBlob], `fatura_${accountData.name.replace(/ /g, '_')}.pdf`, { type: 'application/pdf' });
+  return new File([pdfBlob], `fatura_${accountData.name.replace(/\s/g, '_')}.pdf`, { type: 'application/pdf' });
 };
 
 export const generateFullReportPdf = async (
   accountData: any, relatedInstallments: Account[], paymentBank: BankAccount | null
 ): Promise<File> => {
   const doc = new jsPDF();
-  const logoBase64 = await getLogoBase64();
-  addHeader(doc, `Relatório da Conta: ${accountData.name}`, logoBase64);
+  addHeader(doc, `Relatório da Conta: ${accountData.name}`);
 
-  const body = [
+  const accountBody = [
     ['Nome', accountData.name],
     ['Valor', formatCurrency(accountData.total_value)],
     ['Vencimento', format(new Date(`${accountData.due_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })],
     ['Status', accountData.status],
     ['Tipo', accountData.account_type],
+    ['Observações', accountData.notes],
   ];
+  let finalY = addSection(doc, "Detalhes da Conta", accountBody, 35);
+
+  const paymentBody: (string | null)[][] = [];
   if (accountData.payment_date) {
-    body.push(['Data Pagamento', format(new Date(`${accountData.payment_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })]);
+    paymentBody.push(['Data Pagamento', format(new Date(`${accountData.payment_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })]);
   }
-  if (accountData.notes) {
-    body.push(['Observações', accountData.notes]);
+  paymentBody.push(['Método', accountData.payment_method]);
+  if (paymentBank) {
+    paymentBody.push(["Banco", paymentBank.bank_name]);
+    paymentBody.push(["Titular", paymentBank.owner_name]);
+    paymentBody.push(["CPF", paymentBank.owner_cpf]);
   }
-
-  autoTable(doc, {
-    startY: 40,
-    head: [['Detalhe', 'Valor']],
-    body: body.map(row => [row[0], row[1] || '']),
-  });
-
-  let finalY = (doc as any).lastAutoTable.finalY + 5;
-
-  finalY = addBankDetails(doc, paymentBank!, finalY);
+  finalY = addSection(doc, "Detalhes de Pagamento", paymentBody, finalY);
 
   if (accountData.account_type === 'parcelada' && relatedInstallments.length > 0) {
     if (finalY + 20 > doc.internal.pageSize.height) { doc.addPage(); finalY = 20; }
-    doc.text("Detalhes das Parcelas", 14, finalY);
+    doc.setFontSize(14);
+    doc.text("Parcelas", 14, finalY);
     autoTable(doc, {
       startY: finalY + 5,
-      head: [['Parcela', 'Vencimento', 'Valor', 'Status']],
+      head: [['#', 'Vencimento', 'Valor', 'Status']],
       body: relatedInstallments.map(inst => [
         `${inst.installment_current}/${inst.installments_total}`,
         format(new Date(`${inst.due_date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR }),
@@ -189,37 +177,15 @@ export const generateFullReportPdf = async (
     finalY = (doc as any).lastAutoTable.finalY;
   }
 
-  finalY += 10;
-  if (finalY + 10 > doc.internal.pageSize.height) { doc.addPage(); finalY = 20; }
-  doc.setFontSize(12);
-  doc.text("Anexos (QR Codes)", 14, finalY);
-  finalY += 5;
+  const allAttachments: CustomAttachment[] = [
+    { name: "Fatura (Gerada)", url: accountData.system_generated_bill_url },
+    { name: "Fatura (Upload)", url: accountData.bill_proof_url },
+    { name: "Comprovante", url: accountData.payment_proof_url },
+    ...(accountData.other_attachments || [])
+  ].filter(att => att.url) as CustomAttachment[];
 
-  const addQrCodeToReport = async (label: string, url: string | null | undefined, startY: number): Promise<number> => {
-    let currentY = startY;
-    if (url) {
-      try {
-        const qrCodeImage = await QRCode.toDataURL(url);
-        if (currentY + 40 > doc.internal.pageSize.height) { doc.addPage(); currentY = 20; }
-        doc.setFontSize(10);
-        doc.text(label, 14, currentY);
-        doc.addImage(qrCodeImage, 'PNG', 14, currentY + 2, 30, 30);
-        currentY += 40;
-      } catch (err) { console.error(`Failed to generate QR code for ${label}`, err); }
-    }
-    return currentY;
-  };
-
-  finalY = await addQrCodeToReport("Fatura (Gerada pelo Sistema)", accountData.system_generated_bill_url, finalY);
-  finalY = await addQrCodeToReport("Fatura/Conta (Upload)", accountData.bill_proof_url, finalY);
-  finalY = await addQrCodeToReport("Comprovante de Pagamento", accountData.payment_proof_url, finalY);
-
-  if (accountData.other_attachments && accountData.other_attachments.length > 0) {
-    for (const attachment of accountData.other_attachments) {
-      finalY = await addQrCodeToReport(`Anexo: ${attachment.name}`, attachment.url, finalY);
-    }
-  }
+  finalY = await addAttachmentsToPdf(doc, allAttachments, finalY + 10);
 
   const pdfBlob = doc.output('blob');
-  return new File([pdfBlob], `relatorio_completo_${accountData.name.replace(/ /g, '_')}.pdf`, { type: 'application/pdf' });
+  return new File([pdfBlob], `relatorio_${accountData.name.replace(/\s/g, '_')}.pdf`, { type: 'application/pdf' });
 };

@@ -40,16 +40,17 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
   const [typeFilter, setTypeFilter] = useState('todas');
 
   const { data: profile } = useQuery<Profile | null>({
-    queryKey: ['profile', session?.user?.id],
+    queryKey: ['profile', session?.user?.id, 'admin_check'], // Unique key for this specific query
     queryFn: async () => {
       if (!session?.user?.id) return null;
       const { data, error } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', session.user.id)
+        .limit(1)
         .single();
-      if (error) {
-        console.error("Error fetching profile role:", error);
+      if (error && error.code !== 'PGRST116') { // Ignore 'exact one row' error if no profile exists
+        console.error("Error fetching admin role:", error);
         return null;
       }
       return data;
@@ -244,7 +245,7 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
           <TabsTrigger value="pagas">Contas Pagas</TabsTrigger>
           <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
           {isAdmin && <TabsTrigger value="usuarios">Gestão de Usuários</TabsTrigger>}
-          <TabsTrigger value="config">Configuração</TabsTrigger>
+          <TabsTrigger value="perfil">Perfil</TabsTrigger>
         </TabsList>
         <TabsContent value="contas">
           <Card>
@@ -301,8 +302,8 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
             </Card>
           </TabsContent>
         )}
-        <TabsContent value="config">
-          <ConfigurationTabContent />
+        <TabsContent value="perfil">
+          <ConfigurationTabContent managementType={managementType} />
         </TabsContent>
       </Tabs>
     </div>
