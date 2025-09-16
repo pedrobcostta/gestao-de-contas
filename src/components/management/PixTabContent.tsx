@@ -114,7 +114,12 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
     showSuccess("Dados copiados para a área de transferência!");
   };
 
-  const tableColumns = pixColumns({ onEdit, onViewQr, onDelete, onView });
+  const tableColumns = pixColumns({ 
+    onEdit: handleEdit, 
+    onViewQr: handleViewQr, 
+    onDelete: handleDelete, 
+    onView: handleView 
+  });
 
   const table = useReactTable({
     data: pixKeys,
