@@ -6,9 +6,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Permission } from "@/types";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Label } from "@/components/ui/label";
 
 interface PermissionsGridProps {
   permissions: Permission[];
@@ -19,7 +27,12 @@ interface PermissionsGridProps {
 
 const managements = ['pessoal', 'casa', 'pai', 'mae'];
 const tabs = ['contas', 'pix', 'bancos', 'pagas', 'relatorios', 'perfil', 'usuarios'];
-const actions = ['read', 'write', 'edit', 'delete'];
+const actions = [
+  { id: 'read', label: 'Ler' },
+  { id: 'write', label: 'Escrever' },
+  { id: 'edit', label: 'Editar' },
+  { id: 'delete', label: 'Deletar' },
+];
 
 export function PermissionsGrid({
   permissions = [],
@@ -27,33 +40,10 @@ export function PermissionsGrid({
   selectedManagement,
   onSelectedManagementChange,
 }: PermissionsGridProps) {
-  
+  const isMobile = useIsMobile();
+
   const updatePermissions = (newPermissions: Permission[]) => {
     onPermissionsChange(newPermissions.filter(p => p.can_read || p.can_write || p.can_edit || p.can_delete));
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    let newPermissions = [...permissions];
-    tabs.forEach(tab => {
-      const permIndex = newPermissions.findIndex(p => p.management_type === selectedManagement && p.tab === tab);
-      if (permIndex > -1) {
-        actions.forEach(action => { newPermissions[permIndex][`can_${action}`] = checked; });
-      } else if (checked) {
-        newPermissions.push({ management_type: selectedManagement, tab, can_read: true, can_write: true, can_edit: true, can_delete: true } as Permission);
-      }
-    });
-    updatePermissions(newPermissions);
-  };
-
-  const handleSelectRow = (tab: string, checked: boolean) => {
-    let newPermissions = [...permissions];
-    const permIndex = newPermissions.findIndex(p => p.management_type === selectedManagement && p.tab === tab);
-    if (permIndex > -1) {
-      actions.forEach(action => { newPermissions[permIndex][`can_${action}`] = checked; });
-    } else if (checked) {
-      newPermissions.push({ management_type: selectedManagement, tab, can_read: true, can_write: true, can_edit: true, can_delete: true } as Permission);
-    }
-    updatePermissions(newPermissions);
   };
 
   const handlePermissionChange = (tab: string, action: string, checked: boolean) => {
@@ -71,28 +61,42 @@ export function PermissionsGrid({
     updatePermissions(newPermissions);
   };
 
-  const areAllSelected = tabs.every(tab => {
-    const perm = permissions.find(p => p.management_type === selectedManagement && p.tab === tab);
-    return perm && actions.every(action => perm[`can_${action}`]);
-  });
+  const renderDesktop = () => {
+    const handleSelectAll = (checked: boolean) => {
+      let newPermissions = [...permissions];
+      tabs.forEach(tab => {
+        const permIndex = newPermissions.findIndex(p => p.management_type === selectedManagement && p.tab === tab);
+        if (permIndex > -1) {
+          actions.forEach(action => { newPermissions[permIndex][`can_${action.id}`] = checked; });
+        } else if (checked) {
+          newPermissions.push({ management_type: selectedManagement, tab, can_read: true, can_write: true, can_edit: true, can_delete: true } as Permission);
+        }
+      });
+      updatePermissions(newPermissions);
+    };
 
-  const isRowSelected = (tab: string) => {
-    const perm = permissions.find(p => p.management_type === selectedManagement && p.tab === tab);
-    return perm && actions.every(action => perm[`can_${action}`]);
-  };
+    const handleSelectRow = (tab: string, checked: boolean) => {
+      let newPermissions = [...permissions];
+      const permIndex = newPermissions.findIndex(p => p.management_type === selectedManagement && p.tab === tab);
+      if (permIndex > -1) {
+        actions.forEach(action => { newPermissions[permIndex][`can_${action.id}`] = checked; });
+      } else if (checked) {
+        newPermissions.push({ management_type: selectedManagement, tab, can_read: true, can_write: true, can_edit: true, can_delete: true } as Permission);
+      }
+      updatePermissions(newPermissions);
+    };
 
-  return (
-    <div>
-      <h3 className="text-lg font-medium mb-2">Permissões</h3>
-      <Select value={selectedManagement} onValueChange={onSelectedManagementChange}>
-        <SelectTrigger className="w-[180px] mb-4">
-          <SelectValue placeholder="Selecione a Gestão" />
-        </SelectTrigger>
-        <SelectContent>
-          {managements.map(m => <SelectItem key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</SelectItem>)}
-        </SelectContent>
-      </Select>
+    const areAllSelected = tabs.every(tab => {
+      const perm = permissions.find(p => p.management_type === selectedManagement && p.tab === tab);
+      return perm && actions.every(action => perm[`can_${action.id}`]);
+    });
 
+    const isRowSelected = (tab: string) => {
+      const perm = permissions.find(p => p.management_type === selectedManagement && p.tab === tab);
+      return perm && actions.every(action => perm[`can_${action.id}`]);
+    };
+
+    return (
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -102,10 +106,7 @@ export function PermissionsGrid({
                   <Checkbox checked={areAllSelected} onCheckedChange={handleSelectAll} /> Tab
                 </div>
               </TableHead>
-              <TableHead className="text-center">Ler</TableHead>
-              <TableHead className="text-center">Escrever</TableHead>
-              <TableHead className="text-center">Editar</TableHead>
-              <TableHead className="text-center">Deletar</TableHead>
+              {actions.map(action => <TableHead key={action.id} className="text-center">{action.label}</TableHead>)}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -120,10 +121,10 @@ export function PermissionsGrid({
                     </div>
                   </TableCell>
                   {actions.map(action => (
-                    <TableCell key={action} className="text-center">
+                    <TableCell key={action.id} className="text-center">
                       <Checkbox
-                        checked={currentPerm?.[`can_${action}`] || false}
-                        onCheckedChange={(checked) => handlePermissionChange(tab, action, !!checked)}
+                        checked={currentPerm?.[`can_${action.id}`] || false}
+                        onCheckedChange={(checked) => handlePermissionChange(tab, action.id, !!checked)}
                       />
                     </TableCell>
                   ))}
@@ -133,6 +134,48 @@ export function PermissionsGrid({
           </TableBody>
         </Table>
       </div>
+    );
+  };
+
+  const renderMobile = () => (
+    <Accordion type="multiple" className="w-full">
+      {tabs.map(tab => {
+        const currentPerm = permissions.find((p: Permission) => p.management_type === selectedManagement && p.tab === tab);
+        return (
+          <AccordionItem value={tab} key={tab}>
+            <AccordionTrigger>{tab.charAt(0).toUpperCase() + tab.slice(1)}</AccordionTrigger>
+            <AccordionContent>
+              <div className="grid grid-cols-2 gap-4 p-4">
+                {actions.map(action => (
+                  <div key={action.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`${tab}-${action.id}`}
+                      checked={currentPerm?.[`can_${action.id}`] || false}
+                      onCheckedChange={(checked) => handlePermissionChange(tab, action.id, !!checked)}
+                    />
+                    <Label htmlFor={`${tab}-${action.id}`}>{action.label}</Label>
+                  </div>
+                ))}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        );
+      })}
+    </Accordion>
+  );
+
+  return (
+    <div>
+      <h3 className="text-lg font-medium mb-2">Permissões</h3>
+      <Select value={selectedManagement} onValueChange={onSelectedManagementChange}>
+        <SelectTrigger className="w-[180px] mb-4">
+          <SelectValue placeholder="Selecione a Gestão" />
+        </SelectTrigger>
+        <SelectContent>
+          {managements.map(m => <SelectItem key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      {isMobile ? renderMobile() : renderDesktop()}
     </div>
   );
 }

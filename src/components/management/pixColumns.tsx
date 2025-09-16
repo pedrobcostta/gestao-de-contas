@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge";
 import { PixKey } from "@/types";
-import { showSuccess } from "@/utils/toast";
+import { showError, showSuccess } from "@/utils/toast";
 
 const keyTypeLabels: { [key: string]: string } = {
   cpf_cnpj: "CPF/CNPJ",
@@ -64,8 +64,12 @@ export const pixColumns = ({ onEdit, onViewQr, onDelete, onView }: { onEdit: (pi
           } else {
             textToCopy = `Chave PIX: ${pixKey.key_value}\nBanco: ${pixKey.bank_name}\nTitular: ${pixKey.owner_name}`;
           }
-          navigator.clipboard.writeText(textToCopy);
-          showSuccess("Dados copiados para a área de transferência!");
+          navigator.clipboard.writeText(textToCopy).then(() => {
+            showSuccess("Dados copiados para a área de transferência!");
+          }).catch(err => {
+            console.error("Failed to copy: ", err);
+            showError("Não foi possível copiar. Verifique as permissões do seu navegador.");
+          });
         };
   
         return (

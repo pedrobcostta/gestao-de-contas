@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 
-import { FormField, FormControl, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { FormField, FormControl, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -56,6 +56,9 @@ export const AccountTypeFields = ({ account }: AccountTypeFieldsProps) => {
                   </FormItem>
                 </RadioGroup>
               </FormControl>
+              <FormDescription>
+                O sistema calculará o valor da parcela ou o total automaticamente.
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )} />
@@ -70,6 +73,9 @@ export const AccountTypeFields = ({ account }: AccountTypeFieldsProps) => {
             <FormItem>
               <FormLabel>Parcela Atual</FormLabel>
               <FormControl><Input type="number" {...field} value={field.value ?? ''} placeholder="1" /></FormControl>
+              <FormDescription>
+                Para uma nova compra, use 1. Para uma compra em andamento, informe o número da parcela atual.
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )} />
@@ -78,6 +84,9 @@ export const AccountTypeFields = ({ account }: AccountTypeFieldsProps) => {
               <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
               <div className="space-y-1 leading-none">
                 <FormLabel>Criar parcelas anteriores?</FormLabel>
+                <FormDescription>
+                  Marque esta opção para registrar as parcelas anteriores à atual.
+                </FormDescription>
               </div>
             </FormItem>
           )} />
