@@ -153,7 +153,7 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
               {account.account_type === 'parcelada' && (
                 <div>
                   <p className="font-semibold">Parcela</p>
-                  <p>{account.installment_current ? `${account.installment_current}/${account.installments_total}` : `Total de ${account.installments_total}`}</p>
+                  <p>{`${account.installment_current}/${account.installments_total}`}</p>
                 </div>
               )}
             </CardContent>

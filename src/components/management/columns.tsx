@@ -48,9 +48,9 @@ export const columns = ({ onView, onEdit, onDelete, managementType }: ColumnsPro
             {account.account_type === 'recorrente' && <span title="Conta Recorrente"><Repeat className="h-4 w-4 text-muted-foreground" /></span>}
             <span>
               {account.name}
-              {account.account_type === 'parcelada' && !isGroupedParent && ` (${account.installment_current}/${account.installments_total})`}
+              {account.account_type === 'parcelada' && ` (${account.installment_current}/${account.installments_total})`}
             </span>
-            {isGroupedParent && <Badge variant="outline">{account.installments_total} parcelas</Badge>}
+            {isGroupedParent && <Badge variant="outline">Compra</Badge>}
           </div>
         )
       },

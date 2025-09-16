@@ -117,13 +117,15 @@ const ManagementLayout = ({ title, managementType }: ManagementLayoutProps) => {
         parentStatus = 'pendente';
       }
 
+      const nextUnpaid = subRows.find(inst => inst.status !== 'pago');
+
       const parentRow: Account & { subRows: Account[] } = {
         ...firstInstallment,
         id: groupId,
         total_value: totalValue,
         status: parentStatus,
         name: firstInstallment.name,
-        installment_current: null,
+        installment_current: nextUnpaid ? nextUnpaid.installment_current : (firstInstallment.installments_total || 0),
         subRows: subRows,
       };
       groupedAccounts.push(parentRow);
