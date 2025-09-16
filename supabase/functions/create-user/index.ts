@@ -1,10 +1,19 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { z } from 'https://esm.sh/zod@3.23.8';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+const userSchema = z.object({
+  email: z.string().email("Formato de e-mail inválido."),
+  password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres."),
+  first_name: z.string().min(1, "O nome é obrigatório."),
+  last_name: z.string().min(1, "O sobrenome é obrigatório."),
+  permissions: z.array(z.any()).optional(),
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -17,7 +26,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { email, password, first_name, last_name, permissions } = await req.json();
+    const body = await req.json();
+    const validation = userSchema.safeParse(body);
+
+    if (!validation.success) {
+      return new Response(JSON.stringify({ error: "Dados inválidos", issues: validation.error.issues }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
+    }
+
+    const { email, password, first_name, last_name, permissions } = validation.data;
 
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -29,9 +48,6 @@ serve(async (req) => {
     if (error) {
       if (error.message.includes("User already registered")) {
         throw new Error("Este e-mail já está cadastrado.");
-      }
-      if (error.message.includes("Password should be at least 6 characters")) {
-        throw new Error("A senha deve ter no mínimo 6 caracteres.");
       }
       throw error;
     }

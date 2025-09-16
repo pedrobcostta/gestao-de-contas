@@ -1,21 +1,23 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Home from "./pages/Home";
-import Login from "./pages/Login";
-import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthProvider";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
-import Pessoal from "./pages/Pessoal";
-import Casa from "./pages/Casa";
-import Pai from "./pages/Pai";
-import Mae from "./pages/Mae";
 
 const queryClient = new QueryClient();
+
+const Home = lazy(() => import("./pages/Home"));
+const Login = lazy(() => import("./pages/Login"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Pessoal = lazy(() => import("./pages/Pessoal"));
+const Casa = lazy(() => import("./pages/Casa"));
+const Pai = lazy(() => import("./pages/Pai"));
+const Mae = lazy(() => import("./pages/Mae"));
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -25,20 +27,22 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <PermissionsProvider>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route element={<ProtectedRoute />}>
-                <Route element={<Layout />}>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/pessoal" element={<Pessoal />} />
-                  <Route path="/casa" element={<Casa />} />
-                  <Route path="/pai" element={<Pai />} />
-                  <Route path="/mae" element={<Mae />} />
+            <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Carregando...</div>}>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<Layout />}>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/pessoal" element={<Pessoal />} />
+                    <Route path="/casa" element={<Casa />} />
+                    <Route path="/pai" element={<Pai />} />
+                    <Route path="/mae" element={<Mae />} />
+                  </Route>
                 </Route>
-              </Route>
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </PermissionsProvider>
         </AuthProvider>
       </BrowserRouter>

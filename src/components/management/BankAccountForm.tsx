@@ -39,7 +39,7 @@ const formSchema = z.object({
   account_name: z.string().min(1, "O nome da conta é obrigatório."),
   bank_name: z.string().min(1, "O nome do banco é obrigatório."),
   owner_name: z.string().min(1, "O nome do titular é obrigatório."),
-  owner_cpf: z.string().min(1, "O CPF do titular é obrigatório."),
+  owner_cpf: z.string().min(1, "O CPF do titular é obrigatório.").transform(val => val.replace(/\D/g, '')).refine(val => val.length === 11, { message: "CPF inválido. Deve conter 11 dígitos." }),
   agency: z.string().optional().nullable(),
   account_number: z.string().optional().nullable(),
   card_limit: z.coerce.number().optional().nullable(),
