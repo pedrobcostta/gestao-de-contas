@@ -50,7 +50,7 @@ export const columns = ({ onView, onEdit, onDelete, managementType }: ColumnsPro
               {account.name}
               {account.account_type === 'parcelada' && ` (${account.installment_current}/${account.installments_total})`}
             </span>
-            {isGroupedParent && <Badge variant="outline">Compra</Badge>}
+            {isGroupedParent && <Badge variant="outline">Parcelado</Badge>}
           </div>
         )
       },
