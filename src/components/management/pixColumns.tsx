@@ -24,7 +24,7 @@ const keyTypeLabels: { [key: string]: string } = {
   br_code: "Copia e Cola",
 };
 
-export const pixColumns = ({ onEdit, onViewQr, onDelete }: { onEdit: (pixKey: PixKey) => void; onViewQr: (pixKey: PixKey) => void; onDelete: (pixKey: PixKey) => void; }): ColumnDef<PixKey>[] => {
+export const pixColumns = ({ onEdit, onViewQr, onDelete, onView }: { onEdit: (pixKey: PixKey) => void; onViewQr: (pixKey: PixKey) => void; onDelete: (pixKey: PixKey) => void; onView: (pixKey: PixKey) => void; }): ColumnDef<PixKey>[] => {
   return [
     {
       accessorKey: "key_type",
@@ -78,6 +78,9 @@ export const pixColumns = ({ onEdit, onViewQr, onDelete }: { onEdit: (pixKey: Pi
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onView(pixKey)}>
+                Visualizar
+              </DropdownMenuItem>
               {pixKey.key_type === 'br_code' && (
                 <DropdownMenuItem onClick={() => onViewQr(pixKey)}>
                   <QrCode className="mr-2 h-4 w-4" />

@@ -20,6 +20,7 @@ interface AccountPaymentInfoProps {
 export const AccountPaymentInfo = ({ bankAccounts }: AccountPaymentInfoProps) => {
   const { control, watch } = useFormContext();
   const status = watch("status");
+  const paymentMethod = watch("payment_method");
   const paymentBankId = watch("payment_bank_id");
   const selectedPaymentBank = bankAccounts.find(b => b.id === paymentBankId);
 
@@ -76,18 +77,20 @@ export const AccountPaymentInfo = ({ bankAccounts }: AccountPaymentInfoProps) =>
               <FormMessage />
             </FormItem>
           )} />
-          <FormField control={control} name="payment_bank_id" render={({ field }) => (
-            <FormItem>
-              <FormLabel>Conta/Cartão de Pagamento</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value || ""}>
-                <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
-                <SelectContent>
-                  {bankAccounts.map(b => <SelectItem key={b.id} value={b.id}>{b.account_name} - {b.bank_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )} />
+          {paymentMethod !== 'dinheiro' && (
+            <FormField control={control} name="payment_bank_id" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Conta/Cartão de Pagamento</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ""}>
+                  <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {bankAccounts.map(b => <SelectItem key={b.id} value={b.id}>{b.account_name} - {b.bank_name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+          )}
           {selectedPaymentBank?.account_type === 'cartao_credito' && (
             <FormField control={control} name="card_last_4_digits" render={({ field }) => (
               <FormItem>

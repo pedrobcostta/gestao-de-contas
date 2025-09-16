@@ -23,6 +23,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import { showError, showSuccess } from "@/utils/toast";
+import { BankAccountDetails } from "./BankAccountDetails";
 
 interface BankAccountsTabContentProps {
   managementType: BankAccount["management_type"];
@@ -41,6 +42,8 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
   const [selectedBankAccount, setSelectedBankAccount] = useState<BankAccount | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [bankAccountToDelete, setBankAccountToDelete] = useState<BankAccount | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [bankAccountForDetails, setBankAccountForDetails] = useState<BankAccount | null>(null);
 
   const { data: bankAccounts = [], isLoading } = useQuery({
     queryKey: ['bank_accounts', managementType],
@@ -65,6 +68,11 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
     setIsFormOpen(true);
   };
 
+  const handleView = (bankAccount: BankAccount) => {
+    setBankAccountForDetails(bankAccount);
+    setIsDetailsOpen(true);
+  };
+
   const handleDelete = (bankAccount: BankAccount) => {
     setBankAccountToDelete(bankAccount);
     setIsConfirmOpen(true);
@@ -83,7 +91,7 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
     setBankAccountToDelete(null);
   };
 
-  const tableColumns = bankAccountsColumns({ onEdit: handleEdit, onDelete: handleDelete });
+  const tableColumns = bankAccountsColumns({ onEdit: handleEdit, onDelete: handleDelete, onView: handleView });
 
   const table = useReactTable({
     data: bankAccounts,
@@ -112,6 +120,7 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
               </div>
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => handleView(account)}>Visualizar</Button>
               <Button size="sm" onClick={() => handleEdit(account)}>Editar</Button>
               <Button variant="destructive" size="sm" onClick={() => handleDelete(account)}>Deletar</Button>
             </CardFooter>
@@ -184,6 +193,11 @@ export function BankAccountsTabContent({ managementType }: BankAccountsTabConten
         onConfirm={confirmDelete}
         title="Confirmar Deleção"
         description={`Tem certeza que deseja deletar a conta "${bankAccountToDelete?.account_name}"? Esta ação não pode ser desfeita.`}
+      />
+      <BankAccountDetails
+        isOpen={isDetailsOpen}
+        setIsOpen={setIsDetailsOpen}
+        bankAccount={bankAccountForDetails}
       />
     </div>
   );

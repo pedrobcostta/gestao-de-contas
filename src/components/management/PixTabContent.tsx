@@ -24,6 +24,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import { showError, showSuccess } from "@/utils/toast";
+import { PixDetails } from "./PixDetails";
 
 interface PixTabContentProps {
   managementType: PixKey["management_type"];
@@ -46,6 +47,8 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
   const [qrCodeValue, setQrCodeValue] = useState("");
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [pixKeyToDelete, setPixKeyToDelete] = useState<PixKey | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [pixKeyForDetails, setPixKeyForDetails] = useState<PixKey | null>(null);
 
   const { data: pixKeys = [], isLoading } = useQuery({
     queryKey: ['pix_keys', managementType],
@@ -68,6 +71,11 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
   const handleAdd = () => {
     setSelectedPixKey(null);
     setIsFormOpen(true);
+  };
+
+  const handleView = (pixKey: PixKey) => {
+    setPixKeyForDetails(pixKey);
+    setIsDetailsOpen(true);
   };
 
   const handleViewQr = (pixKey: PixKey) => {
@@ -106,7 +114,7 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
     showSuccess("Dados copiados para a área de transferência!");
   };
 
-  const tableColumns = pixColumns({ onEdit: handleEdit, onViewQr: handleViewQr, onDelete: handleDelete });
+  const tableColumns = pixColumns({ onEdit, onViewQr, onDelete, onView });
 
   const table = useReactTable({
     data: pixKeys,
@@ -139,6 +147,7 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
               </div>
             </CardContent>
             <CardFooter className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => handleView(key)}>Visualizar</Button>
               <Button variant="outline" size="sm" onClick={() => handleCopy(key, 'key')}>Copiar Chave</Button>
               <Button variant="outline" size="sm" onClick={() => handleCopy(key, 'full')}>Copiar Dados</Button>
               <Button size="sm" onClick={() => handleEdit(key)}>Editar</Button>
@@ -218,6 +227,11 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
         onConfirm={confirmDelete}
         title="Confirmar Deleção"
         description={`Tem certeza que deseja deletar a chave PIX "${pixKeyToDelete?.key_value}"?`}
+      />
+      <PixDetails
+        isOpen={isDetailsOpen}
+        setIsOpen={setIsDetailsOpen}
+        pixKey={pixKeyForDetails}
       />
     </div>
   );

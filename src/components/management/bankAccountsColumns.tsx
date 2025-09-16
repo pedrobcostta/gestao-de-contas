@@ -21,7 +21,7 @@ const accountTypeLabels: { [key: string]: string } = {
   cartao_credito: "Cartão de Crédito",
 };
 
-export const bankAccountsColumns = ({ onEdit, onDelete }: { onEdit: (bankAccount: BankAccount) => void; onDelete: (bankAccount: BankAccount) => void; }): ColumnDef<BankAccount>[] => {
+export const bankAccountsColumns = ({ onEdit, onDelete, onView }: { onEdit: (bankAccount: BankAccount) => void; onDelete: (bankAccount: BankAccount) => void; onView: (bankAccount: BankAccount) => void; }): ColumnDef<BankAccount>[] => {
   return [
     {
       accessorKey: "account_name",
@@ -57,6 +57,9 @@ export const bankAccountsColumns = ({ onEdit, onDelete }: { onEdit: (bankAccount
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onView(bankAccount)}>
+                Visualizar
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onEdit(bankAccount)}>
                 Editar
               </DropdownMenuItem>

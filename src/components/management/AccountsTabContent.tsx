@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
-  getExpandedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 import { useQueryClient } from "@tanstack/react-query";
@@ -88,8 +87,9 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
   };
 
   const confirmDeleteAll = async () => {
-    if (!accountToDelete?.group_id) return;
-    const { error } = await supabase.from('accounts').delete().eq('group_id', accountToDelete.group_id);
+    if (!accountToDelete?.group_id && !accountToDelete?.subRows) return;
+    const idToDelete = accountToDelete.group_id || accountToDelete.id;
+    const { error } = await supabase.from('accounts').delete().eq('group_id', idToDelete);
     if (error) {
       showError(`Erro ao deletar: ${error.message}`);
     } else {
@@ -125,8 +125,6 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
     data,
     columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
-    getRowCanExpand: row => !!row.original.subRows,
   });
 
   const renderMobileView = () => (
@@ -155,7 +153,7 @@ export function AccountsTabContent({ data, isLoading, managementType }: Accounts
               {account.account_type === 'parcelada' && (
                 <div>
                   <p className="font-semibold">Parcela</p>
-                  <p>{account.installment_current}/{account.installments_total}</p>
+                  <p>{account.installment_current ? `${account.installment_current}/${account.installments_total}` : `Total de ${account.installments_total}`}</p>
                 </div>
               )}
             </CardContent>
