@@ -58,6 +58,9 @@ export interface BankAccount {
   card_due_day: number | null;
   card_last_4_digits: string | null;
   created_at: string;
+  login_identifier: string | null;
+  access_password: string | null;
+  transaction_password: string | null;
 }
 
 export interface Profile {

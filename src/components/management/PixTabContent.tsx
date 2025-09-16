@@ -95,6 +95,17 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
     setPixKeyToDelete(null);
   };
 
+  const handleCopy = (pixKey: PixKey, type: 'key' | 'full') => {
+    let textToCopy = '';
+    if (type === 'key') {
+      textToCopy = pixKey.key_value;
+    } else {
+      textToCopy = `Chave PIX: ${pixKey.key_value}\nBanco: ${pixKey.bank_name}\nTitular: ${pixKey.owner_name}`;
+    }
+    navigator.clipboard.writeText(textToCopy);
+    showSuccess("Dados copiados para a área de transferência!");
+  };
+
   const tableColumns = pixColumns({ onEdit: handleEdit, onViewQr: handleViewQr, onDelete: handleDelete });
 
   const table = useReactTable({
@@ -127,7 +138,9 @@ export function PixTabContent({ managementType }: PixTabContentProps) {
                 <p>{key.bank_name}</p>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-end gap-2">
+            <CardFooter className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => handleCopy(key, 'key')}>Copiar Chave</Button>
+              <Button variant="outline" size="sm" onClick={() => handleCopy(key, 'full')}>Copiar Dados</Button>
               <Button size="sm" onClick={() => handleEdit(key)}>Editar</Button>
               <Button variant="destructive" size="sm" onClick={() => handleDelete(key)}>Deletar</Button>
             </CardFooter>

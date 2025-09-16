@@ -33,6 +33,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { BankAccount } from "@/types";
 import { showError, showSuccess } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthProvider";
+import { PasswordInput } from "../PasswordInput";
 
 const formSchema = z.object({
   account_type: z.enum(["conta_corrente", "poupanca", "cartao_credito"]),
@@ -46,6 +47,9 @@ const formSchema = z.object({
   card_closing_day: z.coerce.number().min(1, "O dia deve ser no mínimo 1.").max(31, "O dia deve ser no máximo 31.").optional().nullable(),
   card_due_day: z.coerce.number().min(1, "O dia deve ser no mínimo 1.").max(31, "O dia deve ser no máximo 31.").optional().nullable(),
   card_last_4_digits: z.string().length(4, "Deve conter 4 dígitos.").optional().nullable(),
+  login_identifier: z.string().optional().nullable(),
+  access_password: z.string().optional().nullable(),
+  transaction_password: z.string().optional().nullable(),
 }).refine(data => {
   if (data.account_type === 'cartao_credito') {
     return !!data.card_last_4_digits;
@@ -219,6 +223,27 @@ export function BankAccountForm({ isOpen, setIsOpen, bankAccount, managementType
                 )} />
               </>
             )}
+            <FormField control={form.control} name="login_identifier" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Identificador de Login</FormLabel>
+                <FormControl><Input placeholder="Usuário, e-mail, etc." {...field} value={field.value ?? ''} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="access_password" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Senha de Acesso</FormLabel>
+                <FormControl><PasswordInput {...field} value={field.value ?? ''} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="transaction_password" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Senha de Transação</FormLabel>
+                <FormControl><PasswordInput {...field} value={field.value ?? ''} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={isSubmitting}>
