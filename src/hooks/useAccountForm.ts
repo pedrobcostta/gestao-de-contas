@@ -167,7 +167,7 @@ export const useAccountForm = ({ account, managementType, setIsOpen }: UseAccoun
         if (deleteError) throw deleteError;
       }
 
-      const { bill_proof, payment_proof, other_attachments_files, generate_system_bill, pdf_options, ...dbData } = values;
+      const { bill_proof, payment_proof, other_attachments_files, generate_system_bill, pdf_options, value_type, create_previous_installments, previous_installments_status, ...dbData } = values;
       const paymentBank = bankAccounts.find(b => b.id === values.payment_bank_id);
 
       let billProofUrl = account?.bill_proof_url || null;
